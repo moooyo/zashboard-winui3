@@ -1,0 +1,693 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Zashboard.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Zashboard.App.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    d:DesignHeight="768"
+    d:DesignWidth="980"
+    mc:Ignorable="d">
+
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="24,20,24,32">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <controls:PageHeader
+                Title="Settings"
+                Subtitle="Configure the app and manage the active Clash-compatible controller." />
+
+            <InfoBar
+                x:Name="SettingsInfoBar"
+                Grid.Row="1"
+                Margin="0,16,0,0"
+                AutomationProperties.LiveSetting="Polite"
+                IsClosable="True"
+                IsOpen="False" />
+
+            <StackPanel
+                Grid.Row="2"
+                MaxWidth="860"
+                Margin="0,18,0,0"
+                HorizontalAlignment="Stretch"
+                Spacing="22">
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="General" />
+                    <toolkit:SettingsCard
+                        Description="Choose or edit the controller used by this app."
+                        Header="Backend">
+                        <Button
+                            AccessKey="M"
+                            AutomationProperties.HelpText="Open backend management."
+                            AutomationProperties.Name="Manage backends"
+                            Click="OnManageBackendsClicked"
+                            Content="Manage"
+                            TabIndex="0"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Launch the app when you sign in to Windows."
+                        Header="Start with Windows">
+                        <ToggleSwitch
+                            x:Name="StartWithWindowsToggle"
+                            AccessKey="W"
+                            AutomationProperties.HelpText="Launch Zashboard after signing in to Windows."
+                            AutomationProperties.Name="Start with Windows"
+                            Tag="startWithWindows"
+                            TabIndex="1"
+                            Toggled="OnBooleanSettingToggled"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Choose what the close button does."
+                        Header="Close behavior">
+                        <ComboBox
+                            x:Name="CloseBehaviorComboBox"
+                            Width="180"
+                            AccessKey="B"
+                            AutomationProperties.HelpText="Choose whether closing the main window hides or exits the app."
+                            AutomationProperties.Name="Close behavior"
+                            SelectedIndex="0"
+                            SelectionChanged="OnCloseBehaviorChanged"
+                            TabIndex="2"
+                            UseSystemFocusVisuals="True">
+                            <ComboBoxItem Content="Hide to tray" Tag="hideToTray" />
+                            <ComboBoxItem Content="Exit app" Tag="exit" />
+                        </ComboBox>
+                    </toolkit:SettingsCard>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="Appearance" />
+                    <toolkit:SettingsCard
+                        Description="Follow Windows or use a fixed app theme."
+                        Header="Theme">
+                        <ComboBox
+                            x:Name="ThemeComboBox"
+                            Width="160"
+                            AccessKey="T"
+                            AutomationProperties.HelpText="Follow Windows or select a fixed light or dark theme."
+                            AutomationProperties.Name="App theme"
+                            SelectedIndex="0"
+                            SelectionChanged="OnThemeChanged"
+                            TabIndex="3"
+                            UseSystemFocusVisuals="True">
+                            <ComboBoxItem Content="System" Tag="system" />
+                            <ComboBoxItem Content="Light" Tag="light" />
+                            <ComboBoxItem Content="Dark" Tag="dark" />
+                        </ComboBox>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Use the Windows backdrop when the system supports it."
+                        Header="Mica backdrop">
+                        <ToggleSwitch
+                            x:Name="MicaBackdropToggle"
+                            AccessKey="I"
+                            AutomationProperties.HelpText="Use the Windows Mica backdrop when it is supported."
+                            AutomationProperties.Name="Mica backdrop"
+                            IsOn="True"
+                            Tag="micaBackdrop"
+                            TabIndex="4"
+                            Toggled="OnBooleanSettingToggled"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="Controller configuration" />
+                    <TextBlock
+                        x:Name="ControllerConfigurationStatusText"
+                        AutomationProperties.LiveSetting="Polite"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Connect to an online controller to use controller configuration actions."
+                        TextWrapping="Wrap" />
+                    <Border
+                        x:Name="ListenerSettingsPanel"
+                        Padding="18"
+                        Style="{StaticResource DataPaneBorderStyle}">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock
+                                    AutomationProperties.HeadingLevel="Level3"
+                                    Style="{StaticResource SectionTitleTextBlockStyle}"
+                                    Text="Listener settings" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Inbound proxy listeners exposed by the active controller."
+                                    TextWrapping="Wrap" />
+                                <TextBlock
+                                    x:Name="ListenerSettingsStatusText"
+                                    AutomationProperties.LiveSetting="Polite"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Listener settings are disabled until an online controller is connected."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Grid ColumnSpacing="10" RowSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <NumberBox
+                                    x:Name="HttpPortNumberBox"
+                                    MinHeight="40"
+                                    AutomationProperties.HelpText="Enter a whole-number listener port between 0 and 65535."
+                                    AutomationProperties.Name="HTTP listener port"
+                                    Header="HTTP"
+                                    Maximum="65535"
+                                    Minimum="0"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    TabIndex="5"
+                                    ValueChanged="OnListenerPortChanged" />
+                                <NumberBox
+                                    x:Name="SocksPortNumberBox"
+                                    Grid.Column="1"
+                                    MinHeight="40"
+                                    AutomationProperties.HelpText="Enter a whole-number listener port between 0 and 65535."
+                                    AutomationProperties.Name="SOCKS listener port"
+                                    Header="SOCKS"
+                                    Maximum="65535"
+                                    Minimum="0"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    TabIndex="6"
+                                    ValueChanged="OnListenerPortChanged" />
+                                <NumberBox
+                                    x:Name="MixedPortNumberBox"
+                                    Grid.Column="2"
+                                    MinHeight="40"
+                                    AutomationProperties.HelpText="Enter a whole-number listener port between 0 and 65535."
+                                    AutomationProperties.Name="Mixed listener port"
+                                    Header="Mixed"
+                                    Maximum="65535"
+                                    Minimum="0"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    TabIndex="7"
+                                    ValueChanged="OnListenerPortChanged" />
+                                <NumberBox
+                                    x:Name="RedirPortNumberBox"
+                                    Grid.Row="1"
+                                    MinHeight="40"
+                                    AutomationProperties.HelpText="Enter a whole-number listener port between 0 and 65535."
+                                    AutomationProperties.Name="Redir listener port"
+                                    Header="Redir"
+                                    Maximum="65535"
+                                    Minimum="0"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    TabIndex="8"
+                                    ValueChanged="OnListenerPortChanged" />
+                                <NumberBox
+                                    x:Name="TProxyPortNumberBox"
+                                    Grid.Row="1"
+                                    Grid.Column="1"
+                                    MinHeight="40"
+                                    AutomationProperties.HelpText="Enter a whole-number listener port between 0 and 65535."
+                                    AutomationProperties.Name="TProxy listener port"
+                                    Header="TProxy"
+                                    Maximum="65535"
+                                    Minimum="0"
+                                    SmallChange="1"
+                                    SpinButtonPlacementMode="Compact"
+                                    TabIndex="9"
+                                    ValueChanged="OnListenerPortChanged" />
+                                <ToggleSwitch
+                                    x:Name="AllowLanToggle"
+                                    Grid.Row="1"
+                                    Grid.Column="2"
+                                    MinHeight="40"
+                                    VerticalAlignment="Bottom"
+                                    AccessKey="V"
+                                    AutomationProperties.HelpText="Allow devices on the local network to use controller listeners."
+                                    AutomationProperties.Name="Allow LAN access"
+                                    Header="LAN access"
+                                    OffContent="Blocked"
+                                    OnContent="Allowed"
+                                    TabIndex="10"
+                                    Toggled="OnAllowLanToggled" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="ListenerValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="ApplyListenerSettingsButton"
+                                MinHeight="40"
+                                HorizontalAlignment="Left"
+                                AccessKey="J"
+                                AutomationProperties.Name="Apply listener settings"
+                                Click="OnApplyListenerSettingsClicked"
+                                Content="Apply listener settings"
+                                IsEnabled="False"
+                                Style="{StaticResource AccentButtonStyle}"
+                                TabIndex="11" />
+                        </StackPanel>
+                    </Border>
+                    <toolkit:SettingsCard
+                        Description="Ask the controller to reload its current configuration source."
+                        Header="Reload configuration">
+                        <Button
+                            x:Name="ReloadConfigurationButton"
+                            MinHeight="40"
+                            AccessKey="R"
+                            AutomationProperties.HelpText="Reload the active controller configuration source."
+                            AutomationProperties.Name="Reload controller configuration"
+                            Click="OnReloadConfigurationClicked"
+                            Content="Reload"
+                            IsEnabled="False"
+                            TabIndex="12"
+                            ToolTipService.ToolTip="Reload controller configuration"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                    <Border Padding="18" Style="{StaticResource DataPaneBorderStyle}">
+                        <StackPanel Spacing="12">
+                            <StackPanel Spacing="2">
+                                <TextBlock AutomationProperties.HeadingLevel="Level3" Style="{StaticResource SectionTitleTextBlockStyle}" Text="Import configuration" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Send a controller-side path or a local YAML payload to the active backend."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="ConfigurationPathTextBox"
+                                MinHeight="40"
+                                AccessKey="P"
+                                AutomationProperties.HelpText="Enter a path accessible to the controller, or leave it empty when supplying a YAML payload."
+                                AutomationProperties.Name="Controller configuration path"
+                                Header="Controller path"
+                                PlaceholderText="C:\path\to\config.yaml"
+                                TabIndex="13"
+                                TextChanged="OnConfigurationInputChanged"
+                                UseSystemFocusVisuals="True" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    x:Name="LoadConfigurationFileButton"
+                                    MinHeight="40"
+                                    AccessKey="L"
+                                    AutomationProperties.HelpText="Choose a local YAML, JSON, or configuration file."
+                                    AutomationProperties.Name="Load local configuration file"
+                                    Click="OnLoadConfigurationFileClicked"
+                                    Content="Load local file"
+                                    TabIndex="14"
+                                    ToolTipService.ToolTip="Load a local configuration file"
+                                    UseSystemFocusVisuals="True" />
+                                <ToggleSwitch
+                                    x:Name="ForceConfigurationToggle"
+                                    MinHeight="40"
+                                    AccessKey="F"
+                                    AutomationProperties.HelpText="Allow the controller to force the configuration update. This may interrupt active connections."
+                                    AutomationProperties.Name="Force configuration update"
+                                    OffContent="Normal"
+                                    OnContent="Force"
+                                    TabIndex="15"
+                                    UseSystemFocusVisuals="True" />
+                            </StackPanel>
+                            <TextBox
+                                x:Name="ConfigurationPayloadTextBox"
+                                MinHeight="120"
+                                AccessKey="Y"
+                                AcceptsReturn="True"
+                                AutomationProperties.HelpText="Paste the complete configuration YAML, or use the load local file command."
+                                AutomationProperties.Name="Configuration YAML payload"
+                                FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                Header="YAML payload"
+                                PlaceholderText="Paste configuration YAML or load a local file"
+                                TabIndex="16"
+                                TextChanged="OnConfigurationInputChanged"
+                                TextWrapping="NoWrap"
+                                UseSystemFocusVisuals="True" />
+                            <TextBlock
+                                x:Name="ConfigurationValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <Button
+                                x:Name="UpdateConfigurationButton"
+                                MinHeight="40"
+                                AccessKey="A"
+                                HorizontalAlignment="Left"
+                                AutomationProperties.HelpText="Validate and apply the supplied controller path or payload."
+                                AutomationProperties.Name="Apply controller configuration"
+                                Click="OnUpdateConfigurationClicked"
+                                Content="Apply configuration"
+                                IsEnabled="False"
+                                TabIndex="17"
+                                ToolTipService.ToolTip="Apply controller configuration"
+                                UseSystemFocusVisuals="True" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="DNS and caches" />
+                    <Border Padding="18" Style="{StaticResource DataPaneBorderStyle}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Name="DnsNameTextBox"
+                                    MinHeight="40"
+                                    AccessKey="N"
+                                    AutomationProperties.HelpText="Enter the domain name to query through the active controller."
+                                    AutomationProperties.IsRequiredForForm="True"
+                                    AutomationProperties.Name="DNS query name"
+                                    Header="Name"
+                                    InputScope="Url"
+                                    PlaceholderText="example.com"
+                                    TabIndex="18"
+                                    TextChanged="OnDnsNameChanged"
+                                    UseSystemFocusVisuals="True" />
+                                <TextBox
+                                    x:Name="DnsTypeTextBox"
+                                    Grid.Column="1"
+                                    MinHeight="40"
+                                    AccessKey="D"
+                                    AutomationProperties.HelpText="Enter a DNS record type such as A, AAAA, HTTPS, SRV, or TXT."
+                                    AutomationProperties.Name="DNS record type"
+                                    Header="Type"
+                                    InputScope="Text"
+                                    PlaceholderText="A"
+                                    TabIndex="19"
+                                    Text="A"
+                                    TextChanged="OnDnsTypeChanged"
+                                    UseSystemFocusVisuals="True" />
+                                <Button
+                                    x:Name="QueryDnsButton"
+                                    Grid.Column="2"
+                                    MinWidth="88"
+                                    MinHeight="40"
+                                    VerticalAlignment="Bottom"
+                                    AccessKey="Q"
+                                    AutomationProperties.HelpText="Query the active controller for this DNS record."
+                                    AutomationProperties.Name="Run DNS query"
+                                    Click="OnQueryDnsClicked"
+                                    Content="Query"
+                                    IsEnabled="False"
+                                    TabIndex="20"
+                                    ToolTipService.ToolTip="Run DNS query"
+                                    UseSystemFocusVisuals="True" />
+                            </Grid>
+                            <TextBlock
+                                x:Name="DnsValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <TextBlock
+                                x:Name="DnsSummaryText"
+                                AutomationProperties.LiveSetting="Polite"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="No DNS query has been run." />
+                            <TextBlock
+                                x:Name="DnsAnswersHeading"
+                                AutomationProperties.HeadingLevel="Level3"
+                                Style="{StaticResource InlineMetricLabelStyle}"
+                                Text="DNS answers" />
+                            <ListView
+                                x:Name="DnsAnswersList"
+                                MaxHeight="260"
+                                AutomationProperties.HelpText="Read-only DNS records returned by the active controller."
+                                AutomationProperties.LabeledBy="{x:Bind DnsAnswersHeading}"
+                                IsTabStop="True"
+                                ItemsSource="{x:Bind DnsAnswers, Mode=OneWay}"
+                                SelectionMode="Single"
+                                Style="{StaticResource DataListViewStyle}">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="controls:DnsAnswerDisplayItem">
+                                        <Grid
+                                            Padding="8,6"
+                                            MinHeight="40"
+                                            AutomationProperties.Name="{x:Bind AccessibleDescription}"
+                                            ToolTipService.ToolTip="{x:Bind AccessibleDescription}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="70" />
+                                                <ColumnDefinition Width="2*" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="44" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                IsTextSelectionEnabled="True"
+                                                Text="{x:Bind Name}"
+                                                TextWrapping="Wrap" />
+                                            <TextBlock Grid.Column="1" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Type}" />
+                                            <TextBlock
+                                                Grid.Column="2"
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                IsTextSelectionEnabled="True"
+                                                Style="{StaticResource MonospaceTextBlockStyle}"
+                                                Text="{x:Bind Data}"
+                                                TextWrapping="Wrap" />
+                                            <TextBlock Grid.Column="3" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Ttl}" />
+                                            <Button
+                                                Grid.Column="4"
+                                                Width="40"
+                                                Height="40"
+                                                Padding="0"
+                                                AutomationProperties.HelpText="{x:Bind AccessibleDescription}"
+                                                AutomationProperties.Name="Copy DNS answer value"
+                                                Click="OnCopyDnsAnswerClicked"
+                                                Tag="{x:Bind Data}"
+                                                ToolTipService.ToolTip="Copy full DNS answer value"
+                                                UseSystemFocusVisuals="True">
+                                                <FontIcon FontSize="14" Glyph="&#xE8C8;" />
+                                            </Button>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <TextBlock
+                                x:Name="DnsCopyStatusText"
+                                AutomationProperties.LiveSetting="Polite"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button
+                                    x:Name="FlushDnsCacheButton"
+                                    MinHeight="40"
+                                    AccessKey="C"
+                                    AutomationProperties.HelpText="Discard cached DNS records from the active controller."
+                                    Click="OnFlushDnsCacheClicked"
+                                    Content="Flush DNS cache"
+                                    IsEnabled="False"
+                                    TabIndex="21"
+                                    UseSystemFocusVisuals="True" />
+                                <Button
+                                    x:Name="FlushFakeIpCacheButton"
+                                    MinHeight="40"
+                                    AccessKey="K"
+                                    AutomationProperties.HelpText="Discard existing FakeIP mappings from the active controller."
+                                    Click="OnFlushFakeIpCacheClicked"
+                                    Content="Flush FakeIP cache"
+                                    IsEnabled="False"
+                                    TabIndex="22"
+                                    UseSystemFocusVisuals="True" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="Maintenance" />
+                    <toolkit:SettingsCard
+                        Description="Download current GeoIP and geosite data through the controller."
+                        Header="Geo data">
+                        <Button
+                            x:Name="UpdateGeoDataButton"
+                            AccessKey="G"
+                            AutomationProperties.HelpText="Download current GeoIP and geosite data through the active controller."
+                            AutomationProperties.Name="Update Geo data"
+                            Click="OnUpdateGeoDataClicked"
+                            Content="Update"
+                            IsEnabled="False"
+                            TabIndex="23"
+                            ToolTipService.ToolTip="Update GeoIP and geosite data"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Restart the active core and reconnect this app."
+                        Header="Core restart">
+                        <Button
+                            x:Name="RestartCoreButton"
+                            AccessKey="S"
+                            AutomationProperties.HelpText="Restart the active core. Controller access and connections may be interrupted."
+                            AutomationProperties.Name="Restart active core"
+                            Click="OnRestartCoreClicked"
+                            Content="Restart"
+                            IsEnabled="False"
+                            TabIndex="24"
+                            ToolTipService.ToolTip="Restart the active core"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Ask the controller to install a core update, then reconnect."
+                        Header="Core upgrade">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox
+                                x:Name="UpgradeChannelComboBox"
+                                Width="120"
+                                AccessKey="H"
+                                AutomationProperties.HelpText="Choose the release channel requested from the controller."
+                                AutomationProperties.Name="Core upgrade channel"
+                                SelectedIndex="0"
+                                TabIndex="25"
+                                UseSystemFocusVisuals="True">
+                                <ComboBoxItem Content="Automatic" Tag="auto" />
+                                <ComboBoxItem Content="Release" Tag="release" />
+                                <ComboBoxItem Content="Alpha" Tag="alpha" />
+                            </ComboBox>
+                            <Button
+                                x:Name="UpgradeCoreButton"
+                                AccessKey="U"
+                                AutomationProperties.HelpText="Ask the active controller to install a core update."
+                                AutomationProperties.Name="Upgrade active core"
+                                Click="OnUpgradeCoreClicked"
+                                Content="Upgrade"
+                                IsEnabled="False"
+                                TabIndex="26"
+                                ToolTipService.ToolTip="Upgrade the active core"
+                                UseSystemFocusVisuals="True" />
+                        </StackPanel>
+                    </toolkit:SettingsCard>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="Data" />
+                    <toolkit:SettingsCard
+                        Description="Maximum number of log entries retained in memory."
+                        Header="Log buffer size">
+                        <StackPanel Width="180" Spacing="4">
+                            <NumberBox
+                                x:Name="LogBufferSizeNumberBox"
+                                Width="136"
+                                MinHeight="40"
+                                HorizontalAlignment="Left"
+                                AccessKey="Z"
+                                AutomationProperties.HelpText="Set the maximum number of log entries retained in memory, from 500 to 50000."
+                                AutomationProperties.Name="Log buffer size"
+                                LargeChange="1000"
+                                Maximum="50000"
+                                Minimum="500"
+                                SmallChange="500"
+                                SpinButtonPlacementMode="Compact"
+                                Tag="logBufferSize"
+                                TabIndex="27"
+                                UseSystemFocusVisuals="True"
+                                Value="5000"
+                                ValueChanged="OnNumberSettingChanged" />
+                            <TextBlock
+                                x:Name="LogBufferSizeValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Fallback target used when the controller does not advertise a test URL."
+                        Header="Latency test URL">
+                        <StackPanel Width="360" Spacing="4">
+                            <TextBox
+                                x:Name="DelayTestUrlTextBox"
+                                MinHeight="40"
+                                AccessKey="O"
+                                AutomationProperties.HelpText="Enter an absolute HTTP or HTTPS URL used for proxy latency measurements."
+                                AutomationProperties.Name="Latency test URL"
+                                InputScope="Url"
+                                LostFocus="OnDelayTestUrlLostFocus"
+                                PlaceholderText="https://www.gstatic.com/generate_204"
+                                TabIndex="28"
+                                TextChanged="OnDelayTestUrlChanged" />
+                            <TextBlock
+                                x:Name="DelayTestUrlValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Maximum time allowed for each proxy latency measurement."
+                        Header="Latency timeout">
+                        <StackPanel Width="180" Spacing="4">
+                            <NumberBox
+                                x:Name="DelayTimeoutNumberBox"
+                                Width="136"
+                                MinHeight="40"
+                                HorizontalAlignment="Left"
+                                AccessKey="X"
+                                AutomationProperties.HelpText="Set a whole-number timeout from 1 to 60 seconds."
+                                AutomationProperties.Name="Latency timeout in seconds"
+                                Header="Seconds"
+                                Maximum="60"
+                                Minimum="1"
+                                SmallChange="1"
+                                SpinButtonPlacementMode="Compact"
+                                Tag="delayTimeoutSeconds"
+                                TabIndex="29"
+                                Value="5"
+                                ValueChanged="OnNumberSettingChanged" />
+                            <TextBlock
+                                x:Name="DelayTimeoutValidationText"
+                                AutomationProperties.LiveSetting="Assertive"
+                                Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                                TextWrapping="Wrap"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </toolkit:SettingsCard>
+                    <toolkit:SettingsCard
+                        Description="Reset observed endpoint support and immediately refresh read-only capability evidence."
+                        Header="Capability detection">
+                        <Button
+                            x:Name="ReprobeCapabilitiesButton"
+                            AccessKey="E"
+                            AutomationProperties.HelpText="Clear cached endpoint support and refresh controller capability evidence."
+                            AutomationProperties.Name="Re-probe controller capabilities"
+                            Click="OnClearCapabilityCacheClicked"
+                            Content="Re-probe"
+                            IsEnabled="False"
+                            TabIndex="30"
+                            ToolTipService.ToolTip="Re-probe controller capabilities"
+                            UseSystemFocusVisuals="True" />
+                    </toolkit:SettingsCard>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                    <TextBlock AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleTextBlockStyle}" Text="About" />
+                    <toolkit:SettingsCard
+                        Description="Native Windows client for Clash-compatible controllers."
+                        Header="Zashboard">
+                        <TextBlock
+                            x:Name="AppVersionText"
+                            AutomationProperties.Name="Zashboard version"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="--" />
+                    </toolkit:SettingsCard>
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</Page>

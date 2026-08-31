@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Zashboard.App/Zashboard.App.csproj" />
+    <Project Path="src/Zashboard.Core/Zashboard.Core.csproj" />
+    <Project Path="src/Zashboard.Infrastructure/Zashboard.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Zashboard.App.Logic.Tests/Zashboard.App.Logic.Tests.csproj" />
+    <Project Path="tests/Zashboard.Core.Tests/Zashboard.Core.Tests.csproj" />
+    <Project Path="tests/Zashboard.Infrastructure.Tests/Zashboard.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

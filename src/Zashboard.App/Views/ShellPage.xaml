@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Zashboard.App.Views.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="768"
+    d:DesignWidth="1280"
+    mc:Ignorable="d">
+
+    <NavigationView
+        x:Name="RootNavigation"
+        AlwaysShowHeader="False"
+        AutomationProperties.HelpText="Use the navigation items to open an app page."
+        AutomationProperties.Name="Primary navigation"
+        CompactModeThresholdWidth="720"
+        ExpandedModeThresholdWidth="1080"
+        IsBackButtonVisible="Collapsed"
+        IsPaneToggleButtonVisible="True"
+        IsSettingsVisible="True"
+        ItemInvoked="OnNavigationItemInvoked"
+        Loaded="OnShellLoaded"
+        OpenPaneLength="252"
+        PaneDisplayMode="Auto"
+        PaneTitle="Zashboard">
+
+        <NavigationView.MenuItems>
+            <NavigationViewItem
+                x:Name="OverviewNavigationItem"
+                AccessKey="1"
+                AutomationProperties.HelpText="Open the overview page."
+                Content="Overview"
+                Tag="overview"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE80F;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                AccessKey="2"
+                AutomationProperties.HelpText="Open proxy groups and providers."
+                Content="Proxies"
+                Tag="proxies"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE8AB;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                AccessKey="3"
+                AutomationProperties.HelpText="Open active connections."
+                Content="Connections"
+                Tag="connections"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE968;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                AccessKey="4"
+                AutomationProperties.HelpText="Open routing rules and rule providers."
+                Content="Rules"
+                Tag="rules"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE71D;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+            <NavigationViewItem
+                AccessKey="5"
+                AutomationProperties.HelpText="Open streamed controller logs."
+                Content="Logs"
+                Tag="logs"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE8A5;" />
+                </NavigationViewItem.Icon>
+            </NavigationViewItem>
+        </NavigationView.MenuItems>
+
+        <NavigationView.FooterMenuItems>
+            <NavigationViewItem
+                x:Name="BackendsNavigationItem"
+                AccessKey="6"
+                AutomationProperties.HelpText="Choose a controller backend or open backend management."
+                Content="Backends"
+                Tag="backends"
+                UseSystemFocusVisuals="True">
+                <NavigationViewItem.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE774;" />
+                </NavigationViewItem.Icon>
+                <NavigationViewItem.ContextFlyout>
+                    <Flyout
+                        x:Name="BackendsFlyout"
+                        Placement="RightEdgeAlignedBottom">
+                        <Grid Width="320">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock
+                                AutomationProperties.HeadingLevel="Level2"
+                                Style="{StaticResource SectionTitleTextBlockStyle}"
+                                Text="Backends" />
+                            <TextBlock
+                                Grid.Row="1"
+                                Margin="0,2,0,10"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Choose the active controller"
+                                TextWrapping="Wrap" />
+                            <ListView
+                                x:Name="QuickBackendsList"
+                                Grid.Row="2"
+                                MaxHeight="320"
+                                AutomationProperties.Name="Saved controller backends"
+                                IsItemClickEnabled="True"
+                                ItemClick="OnQuickBackendClicked"
+                                SelectionMode="None"
+                                Style="{StaticResource DataListViewStyle}">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate xmlns:controls="using:Zashboard.App.Controls" x:DataType="controls:BackendDisplayItem">
+                                        <Grid
+                                            MinHeight="56"
+                                            Padding="10,7"
+                                            AutomationProperties.ItemStatus="{x:Bind Status}"
+                                            AutomationProperties.Name="{x:Bind AccessibleDescription}">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind Name}"
+                                                TextTrimming="CharacterEllipsis" />
+                                            <TextBlock
+                                                Grid.Column="1"
+                                                Margin="12,0,0,0"
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="{x:Bind Status}" />
+                                            <TextBlock
+                                                Grid.Row="1"
+                                                Grid.ColumnSpan="2"
+                                                Margin="0,2,0,0"
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                                FontSize="12"
+                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                Text="{x:Bind Address}"
+                                                TextTrimming="CharacterEllipsis" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                            <Button
+                                Grid.Row="3"
+                                Margin="0,10,0,0"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                AutomationProperties.HelpText="Add, edit, or remove controller backends."
+                                Click="OnManageBackendsClicked"
+                                UseSystemFocusVisuals="True">
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon
+                                        AutomationProperties.AccessibilityView="Raw"
+                                        FontSize="16"
+                                        Glyph="&#xE713;" />
+                                    <TextBlock Text="Manage backends" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Flyout>
+                </NavigationViewItem.ContextFlyout>
+            </NavigationViewItem>
+        </NavigationView.FooterMenuItems>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <StackPanel Margin="16,8,16,0" Spacing="8">
+                <InfoBar
+                    x:Name="SessionInfoBar"
+                    AutomationProperties.LiveSetting="Polite"
+                    IsClosable="True"
+                    IsOpen="False" />
+                <InfoBar
+                    x:Name="OperationInfoBar"
+                    AutomationProperties.LiveSetting="Polite"
+                    IsClosable="True"
+                    IsOpen="False" />
+            </StackPanel>
+            <ProgressBar
+                x:Name="OperationProgressBar"
+                Grid.Row="1"
+                Margin="16,4,16,0"
+                AutomationProperties.LiveSetting="Polite"
+                AutomationProperties.Name="Controller operation in progress"
+                IsIndeterminate="True"
+                Visibility="Collapsed" />
+            <Frame
+                x:Name="ContentFrame"
+                Grid.Row="2"
+                AutomationProperties.Name="Page content"
+                Navigated="OnFrameNavigated" />
+        </Grid>
+    </NavigationView>
+</Page>

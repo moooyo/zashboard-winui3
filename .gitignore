@@ -1,0 +1,46 @@
+## Build outputs
+bin/
+obj/
+artifacts/
+AppPackages/
+BundleArtifacts/
+
+## IDE state
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Packaging and signing
+*.appx
+*.appxbundle
+*.msix
+*.msixbundle
+*.cer
+*.pfx
+*.p12
+
+## Native AOT
+*.ni.dll
+*.ni.pdb
+*.nativecodeanalysis.xml
+
+## Local configuration and secrets
+appsettings.Local.json
+*.secrets.json
+.env
+.env.*
+!.env.example
+
+## Operating system files
+Thumbs.db
+Desktop.ini
+.DS_Store

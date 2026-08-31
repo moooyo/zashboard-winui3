@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Restore tests
+        run: dotnet restore Zashboard.slnx
+
+      - name: Run Core tests
+        run: dotnet test tests/Zashboard.Core.Tests/Zashboard.Core.Tests.csproj --configuration Release --no-restore --nologo
+
+      - name: Run application logic tests
+        run: dotnet test tests/Zashboard.App.Logic.Tests/Zashboard.App.Logic.Tests.csproj --configuration Release --no-restore --nologo
+
+      - name: Run Infrastructure tests
+        run: dotnet test tests/Zashboard.Infrastructure.Tests/Zashboard.Infrastructure.Tests.csproj --configuration Release --no-restore --nologo
+
+  publish-aot:
+    name: Native AOT (${{ matrix.platform }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: x64
+            rid: win-x64
+            machine: Amd64
+          - platform: ARM64
+            rid: win-arm64
+            machine: Arm64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.400
+
+      - name: Configure MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Publish and run x64 Native AOT runtime smoke
+        if: ${{ matrix.rid == 'win-x64' }}
+        shell: pwsh
+        run: |
+          $publishDirectory = Join-Path $PWD 'artifacts/native-aot-smoke/win-x64'
+          dotnet restore eng/smoke/Zashboard.NativeAot.Smoke/Zashboard.NativeAot.Smoke.csproj `
+            --runtime win-x64 `
+            -p:Configuration=Release `
+            -p:PublishAot=true `
+            -p:SelfContained=true `
+            -p:PublishTrimmed=true `
+            -p:PublishReadyToRun=false
+          if ($LASTEXITCODE -ne 0) { throw 'Native AOT smoke restore failed.' }
+
+          dotnet publish eng/smoke/Zashboard.NativeAot.Smoke/Zashboard.NativeAot.Smoke.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --no-restore `
+            --self-contained true `
+            --output $publishDirectory `
+            -p:PublishAot=true `
+            -p:PublishTrimmed=true `
+            -p:TrimMode=full `
+            -p:PublishReadyToRun=false `
+            -p:PublishSingleFile=false `
+            -p:DebuggerSupport=true
+          if ($LASTEXITCODE -ne 0) { throw 'Native AOT smoke publish failed.' }
+
+          ./eng/Assert-NativeAot.ps1 `
+            -PublishDirectory $publishDirectory `
+            -ExecutableName Zashboard.NativeAot.Smoke.exe `
+            -ExpectedMachine Amd64
+
+          $env:ZASHBOARD_REQUIRE_NATIVE_AOT = '1'
+          $executable = Join-Path $publishDirectory 'Zashboard.NativeAot.Smoke.exe'
+          $output = @(& $executable)
+          if ($LASTEXITCODE -ne 0) { throw 'Native AOT smoke process failed.' }
+          if ($output -notcontains 'ZASHBOARD_NATIVE_AOT_SMOKE_OK') {
+            throw 'The Native AOT smoke marker was not emitted.'
+          }
+
+      - name: Verify package visual assets
+        shell: pwsh
+        run: ./eng/Assert-PackageAssets.ps1
+
+      - name: Restore application
+        run: dotnet restore src/Zashboard.App/Zashboard.App.csproj --runtime ${{ matrix.rid }} -p:Configuration=Release -p:Platform=${{ matrix.platform }} -p:PublishAot=true -p:SelfContained=true -p:PublishTrimmed=true
+
+      - name: Publish Native AOT package
+        shell: pwsh
+        run: |
+          dotnet publish src/Zashboard.App/Zashboard.App.csproj `
+            --configuration Release `
+            --runtime ${{ matrix.rid }} `
+            --no-restore `
+            --output artifacts/publish/${{ matrix.rid }} `
+            -p:Platform=${{ matrix.platform }} `
+            -p:PublishAot=true `
+            -p:SelfContained=true `
+            -p:PublishTrimmed=true `
+            -p:PublishReadyToRun=false `
+            -p:AppxBundle=Never `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=false
+
+      - name: Prove Native AOT image
+        shell: pwsh
+        run: ./eng/Assert-NativeAot.ps1 -PublishDirectory artifacts/publish/${{ matrix.rid }} -ExpectedMachine ${{ matrix.machine }}
+
+      - name: Prove Native AOT MSIX
+        shell: pwsh
+        run: ./eng/Assert-MsixNativeAot.ps1 -PackageDirectory src/Zashboard.App/AppPackages -Platform ${{ matrix.platform }}
+
+      - name: Upload Native AOT artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zashboard-${{ matrix.rid }}-native-aot
+          path: |
+            artifacts/publish/${{ matrix.rid }}/**
+            artifacts/native-aot-smoke/${{ matrix.rid }}/**
+            src/Zashboard.App/AppPackages/**
+          if-no-files-found: error

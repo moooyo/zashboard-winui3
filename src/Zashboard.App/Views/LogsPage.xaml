@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Zashboard.App.Views.LogsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Zashboard.App.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    d:DesignHeight="768"
+    d:DesignWidth="1180"
+    mc:Ignorable="d">
+
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator
+            Invoked="OnFocusSearchAccelerator"
+            Key="F"
+            Modifiers="Control" />
+    </Page.KeyboardAccelerators>
+
+    <Grid Padding="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <controls:PageHeader
+            Title="Logs"
+            Subtitle="Follow the controller log stream without losing the current selection." />
+
+        <CommandBar
+            Grid.Row="1"
+            Margin="-12,8,-12,0"
+            Style="{StaticResource SubtleCommandBarStyle}">
+            <CommandBar.Content>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <AutoSuggestBox
+                        x:Name="LogSearchBox"
+                        Width="260"
+                        AccessKey="S"
+                        AutomationProperties.AcceleratorKey="Control+F"
+                        AutomationProperties.HelpText="Filter log messages by text. Press Control+F to focus this field."
+                        AutomationProperties.Name="Search logs"
+                        PlaceholderText="Search logs"
+                        TabIndex="0"
+                        TextChanged="OnLogSearchTextChanged"
+                        UseSystemFocusVisuals="True">
+                        <AutoSuggestBox.QueryIcon>
+                            <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Find" />
+                        </AutoSuggestBox.QueryIcon>
+                    </AutoSuggestBox>
+                    <ComboBox
+                        x:Name="LogLevelFilterBox"
+                        Width="130"
+                        AccessKey="V"
+                        AutomationProperties.HelpText="Show messages at or above the selected severity."
+                        AutomationProperties.Name="Minimum log level"
+                        SelectedIndex="0"
+                        SelectionChanged="OnLogLevelChanged"
+                        TabIndex="1"
+                        UseSystemFocusVisuals="True">
+                        <ComboBoxItem Content="All received" Tag="all" />
+                        <ComboBoxItem Content="Debug+" Tag="debug" />
+                        <ComboBoxItem Content="Info+" Tag="info" />
+                        <ComboBoxItem Content="Warning+" Tag="warning" />
+                        <ComboBoxItem Content="Error+" Tag="error" />
+                    </ComboBox>
+                </StackPanel>
+            </CommandBar.Content>
+            <AppBarToggleButton
+                x:Name="PauseLogsButton"
+                AccessKey="P"
+                AutomationProperties.HelpText="Freeze or resume the displayed log snapshot."
+                AutomationProperties.Name="Pause log display updates"
+                Checked="OnPauseToggled"
+                Label="Pause"
+                TabIndex="2"
+                ToolTipService.ToolTip="Freeze the displayed log snapshot"
+                Unchecked="OnPauseToggled"
+                UseSystemFocusVisuals="True">
+                <AppBarToggleButton.Icon>
+                    <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Pause" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarToggleButton
+                x:Name="FollowTailButton"
+                AccessKey="F"
+                AutomationProperties.HelpText="Keep the newest log entry in view."
+                AutomationProperties.Name="Follow newest log entry"
+                Checked="OnFollowTailToggled"
+                IsChecked="True"
+                Label="Follow"
+                TabIndex="3"
+                ToolTipService.ToolTip="Keep the newest entry in view"
+                Unchecked="OnFollowTailToggled"
+                UseSystemFocusVisuals="True">
+                <AppBarToggleButton.Icon>
+                    <FontIcon AutomationProperties.AccessibilityView="Raw" Glyph="&#xE74B;" />
+                </AppBarToggleButton.Icon>
+            </AppBarToggleButton>
+            <AppBarButton
+                x:Name="CopyLogsButton"
+                AccessKey="C"
+                AutomationProperties.HelpText="Copy the selected log entries to the clipboard."
+                AutomationProperties.Name="Copy selected log entries"
+                Click="OnCopyClicked"
+                IsEnabled="False"
+                Label="Copy"
+                TabIndex="4"
+                ToolTipService.ToolTip="Copy selected log entries"
+                UseSystemFocusVisuals="True">
+                <AppBarButton.Icon>
+                    <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Copy" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="InspectLogButton"
+                AccessKey="D"
+                AutomationProperties.HelpText="Inspect and copy the complete selected log entry."
+                AutomationProperties.Name="Inspect one selected log entry"
+                Click="OnInspectClicked"
+                IsEnabled="False"
+                Label="Details"
+                TabIndex="5"
+                ToolTipService.ToolTip="Inspect the complete selected entry"
+                UseSystemFocusVisuals="True">
+                <AppBarButton.Icon>
+                    <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="View" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton
+                AccessKey="X"
+                AutomationProperties.HelpText="Remove all retained log entries."
+                AutomationProperties.Name="Clear retained log entries"
+                Click="OnClearClicked"
+                Label="Clear"
+                TabIndex="6"
+                ToolTipService.ToolTip="Clear retained log entries"
+                UseSystemFocusVisuals="True">
+                <AppBarButton.Icon>
+                    <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Delete" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+        </CommandBar>
+
+        <TextBlock
+            x:Name="LogsStatusText"
+            Grid.Row="2"
+            Margin="4,4,4,0"
+            AutomationProperties.LiveSetting="Off"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="Live - following newest - 0 retained"
+            TextWrapping="Wrap" />
+
+        <InfoBar
+            x:Name="LogsInfoBar"
+            Grid.Row="3"
+            Margin="0,8,0,0"
+            AutomationProperties.LiveSetting="Polite"
+            IsClosable="True"
+            IsOpen="False" />
+
+        <Border
+            Grid.Row="5"
+            HighContrastAdjustment="Auto"
+            Style="{StaticResource DataPaneBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid
+                    Padding="16,8"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,0,1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="118" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock AutomationProperties.HeadingLevel="Level3" Style="{StaticResource LogColumnHeaderTextBlockStyle}" Text="Time" />
+                    <TextBlock Grid.Column="1" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource LogColumnHeaderTextBlockStyle}" Text="Level" />
+                    <TextBlock Grid.Column="2" AutomationProperties.HeadingLevel="Level3" Style="{StaticResource LogColumnHeaderTextBlockStyle}" Text="Message" />
+                </Grid>
+                <Grid Grid.Row="1">
+                    <ListView
+                        x:Name="LogsList"
+                        AutomationProperties.HelpText="Select one or more entries to copy. New entries are not announced automatically."
+                        AutomationProperties.LiveSetting="Off"
+                        AutomationProperties.Name="Controller log entries"
+                        DoubleTapped="OnLogDoubleTapped"
+                        SelectionChanged="OnLogSelectionChanged"
+                        SelectionMode="Extended"
+                        Style="{StaticResource DataListViewStyle}"
+                        TabIndex="7"
+                        UseSystemFocusVisuals="True">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="controls:LogDisplayItem">
+                                <Border
+                                    AutomationProperties.ItemStatus="{x:Bind Level}"
+                                    AutomationProperties.LiveSetting="Off"
+                                    AutomationProperties.Name="{x:Bind AccessibleDescription}"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    HighContrastAdjustment="Auto">
+                                    <Grid Padding="16,7">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="118" />
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock AutomationProperties.AccessibilityView="Raw" Style="{StaticResource MonospaceTextBlockStyle}" Text="{x:Bind TimestampText}" />
+                                        <Border
+                                            Grid.Column="1"
+                                            Margin="0,0,12,0"
+                                            Padding="6,2"
+                                            HorizontalAlignment="Left"
+                                            AutomationProperties.AccessibilityView="Raw"
+                                            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="2"
+                                            HighContrastAdjustment="Auto">
+                                            <TextBlock
+                                                AutomationProperties.AccessibilityView="Raw"
+                                                FontFamily="{StaticResource AppMonospaceFontFamily}"
+                                                FontWeight="SemiBold"
+                                                Text="{x:Bind Level}" />
+                                        </Border>
+                                        <TextBlock Grid.Column="2" AutomationProperties.AccessibilityView="Raw" Style="{StaticResource MonospaceTextBlockStyle}" Text="{x:Bind Message}" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <controls:EmptyState
+                        x:Name="LogsEmptyState"
+                        Description="Log messages will appear while a controller stream is connected."
+                        IconGlyph="&#xE8A5;"
+                        StateTitle="No log messages" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

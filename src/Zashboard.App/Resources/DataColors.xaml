@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Default">
+            <SolidColorBrush x:Key="WindowFallbackBackgroundBrush" Color="#FF202020" />
+            <SolidColorBrush x:Key="DownloadAccentBrush" Color="#45C2B1" />
+            <SolidColorBrush x:Key="DownloadAccentMutedBrush" Color="#2645C2B1" />
+            <SolidColorBrush x:Key="UploadAccentBrush" Color="#FF846B" />
+            <SolidColorBrush x:Key="UploadAccentMutedBrush" Color="#26FF846B" />
+            <SolidColorBrush x:Key="MemoryAccentBrush" Color="#AEB8C8" />
+            <SolidColorBrush x:Key="MemoryAccentMutedBrush" Color="#24AEB8C8" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="WindowFallbackBackgroundBrush" Color="#FFF3F3F3" />
+            <SolidColorBrush x:Key="DownloadAccentBrush" Color="#007F78" />
+            <SolidColorBrush x:Key="DownloadAccentMutedBrush" Color="#1F007F78" />
+            <SolidColorBrush x:Key="UploadAccentBrush" Color="#C74732" />
+            <SolidColorBrush x:Key="UploadAccentMutedBrush" Color="#1FC74732" />
+            <SolidColorBrush x:Key="MemoryAccentBrush" Color="#596273" />
+            <SolidColorBrush x:Key="MemoryAccentMutedBrush" Color="#1F596273" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="WindowFallbackBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="DownloadAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+            <SolidColorBrush x:Key="DownloadAccentMutedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="UploadAccentBrush" Color="{ThemeResource SystemColorHotlightColor}" />
+            <SolidColorBrush x:Key="UploadAccentMutedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="MemoryAccentBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+            <SolidColorBrush x:Key="MemoryAccentMutedBrush" Color="{ThemeResource SystemColorWindowColor}" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

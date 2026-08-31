@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="Zashboard.App.Controls.TrendChart"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    MinHeight="190"
+    AutomationProperties.LiveSetting="Off"
+    IsTabStop="False"
+    mc:Ignorable="d">
+
+    <Border Padding="16,14" Style="{StaticResource DataPaneBorderStyle}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="10" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="1">
+                    <TextBlock
+                        AutomationProperties.HeadingLevel="Level2"
+                        Style="{StaticResource SectionTitleTextBlockStyle}"
+                        Text="{x:Bind Title, Mode=OneWay}" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource InlineMetricLabelStyle}"
+                        Text="Recent activity" />
+                </StackPanel>
+                <TextBlock
+                    x:Name="CurrentSummaryText"
+                    Grid.Column="1"
+                    MaxWidth="260"
+                    VerticalAlignment="Top"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextAlignment="Right"
+                    TextTrimming="CharacterEllipsis" />
+            </Grid>
+
+            <Grid Grid.Row="2">
+                <Canvas
+                    x:Name="PlotCanvas"
+                    Height="124"
+                    AutomationProperties.AccessibilityView="Raw"
+                    SizeChanged="OnPlotSizeChanged">
+                    <Line x:Name="GridLineTop" Stroke="{ThemeResource DividerStrokeColorDefaultBrush}" StrokeThickness="1" />
+                    <Line x:Name="GridLineUpper" Stroke="{ThemeResource DividerStrokeColorDefaultBrush}" StrokeDashArray="2,3" StrokeThickness="1" />
+                    <Line x:Name="GridLineLower" Stroke="{ThemeResource DividerStrokeColorDefaultBrush}" StrokeDashArray="2,3" StrokeThickness="1" />
+                    <Line x:Name="GridLineBottom" Stroke="{ThemeResource DividerStrokeColorDefaultBrush}" StrokeThickness="1" />
+                    <Polygon
+                        x:Name="PrimaryArea"
+                        Fill="{x:Bind PrimaryFillBrush, Mode=OneWay}"
+                        StrokeThickness="0" />
+                    <Polyline
+                        x:Name="PrimaryLine"
+                        Stroke="{x:Bind PrimaryStrokeBrush, Mode=OneWay}"
+                        StrokeLineJoin="Round"
+                        StrokeThickness="2" />
+                    <Polyline
+                        x:Name="SecondaryLine"
+                        Stroke="{x:Bind SecondaryStrokeBrush, Mode=OneWay}"
+                        StrokeDashArray="4,3"
+                        StrokeLineJoin="Round"
+                        StrokeThickness="2"
+                        Visibility="{x:Bind IsSecondarySeriesVisible, Mode=OneWay}" />
+                </Canvas>
+                <TextBlock
+                    x:Name="ScaleMaximumText"
+                    Margin="0,2,4,0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    FontSize="11" />
+                <TextBlock
+                    x:Name="EmptyChartText"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    AutomationProperties.AccessibilityView="Raw"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Waiting for live samples" />
+            </Grid>
+
+            <StackPanel
+                Grid.Row="4"
+                Orientation="Horizontal"
+                Spacing="16">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Border
+                        Width="14"
+                        Height="3"
+                        VerticalAlignment="Center"
+                        Background="{x:Bind PrimaryStrokeBrush, Mode=OneWay}"
+                        CornerRadius="2" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource InlineMetricLabelStyle}"
+                        Text="{x:Bind PrimaryLabel, Mode=OneWay}" />
+                </StackPanel>
+                <StackPanel
+                    Orientation="Horizontal"
+                    Spacing="6"
+                    Visibility="{x:Bind IsSecondarySeriesVisible, Mode=OneWay}">
+                    <Grid Width="14" Height="5" VerticalAlignment="Center">
+                        <Rectangle
+                            Height="2"
+                            VerticalAlignment="Top"
+                            Fill="{x:Bind SecondaryStrokeBrush, Mode=OneWay}" />
+                        <Rectangle
+                            Height="2"
+                            VerticalAlignment="Bottom"
+                            Fill="{x:Bind SecondaryStrokeBrush, Mode=OneWay}" />
+                    </Grid>
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Style="{StaticResource InlineMetricLabelStyle}"
+                        Text="{x:Bind SecondaryLabel, Mode=OneWay}" />
+                </StackPanel>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

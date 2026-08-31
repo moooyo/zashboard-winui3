@@ -1,0 +1,374 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Zashboard.App.Views.OverviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:Zashboard.App.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:toolkit="using:CommunityToolkit.WinUI.Controls"
+    d:DesignHeight="768"
+    d:DesignWidth="1180"
+    mc:Ignorable="d">
+
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <Grid Padding="24,20,24,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="12" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition x:Name="HonkStatisticsGutter" Height="0" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <controls:PageHeader
+                Title="Overview"
+                Subtitle="Live controller status and current traffic." />
+            <StackPanel
+                x:Name="SessionStatePanel"
+                Grid.Column="1"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Center"
+                AutomationProperties.LiveSetting="Polite"
+                Orientation="Horizontal"
+                Spacing="8">
+                <Ellipse
+                    x:Name="SessionStateIndicator"
+                    Width="8"
+                    Height="8"
+                    Fill="{ThemeResource TextFillColorTertiaryBrush}" />
+                <TextBlock
+                    x:Name="SessionStateText"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="No backend" />
+            </StackPanel>
+        </Grid>
+
+        <CommandBar
+            Grid.Row="1"
+            Margin="-12,8,-12,0"
+            Style="{StaticResource SubtleCommandBarStyle}">
+                <AppBarButton
+                    x:Name="RefreshOverviewButton"
+                    Click="OnRefreshClicked"
+                    IsEnabled="False"
+                    Label="Refresh">
+                <AppBarButton.Icon>
+                    <SymbolIcon Symbol="Refresh" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+        </CommandBar>
+
+        <StackPanel Grid.Row="2" Margin="0,8,0,0" Spacing="8">
+            <InfoBar
+                x:Name="SessionStatusInfoBar"
+                AutomationProperties.LiveSetting="Polite"
+                IsClosable="False"
+                IsOpen="True"
+                Message="Choose a backend to load controller data."
+                Severity="Informational"
+                Title="No backend" />
+            <InfoBar
+                x:Name="OperationInfoBar"
+                AutomationProperties.LiveSetting="Polite"
+                IsClosable="True"
+                IsOpen="False" />
+        </StackPanel>
+
+        <Border
+            Grid.Row="3"
+            Margin="0,16,0,0"
+            Padding="20,18"
+            Style="{StaticResource DataPaneBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="16" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <controls:TrafficIndicator
+                    x:Name="DownloadRateIndicator"
+                    Margin="0,0,24,0"
+                    AccentBrush="{ThemeResource DownloadAccentBrush}"
+                    Label="Download"
+                    Value="--" />
+                <Border
+                    Grid.Column="1"
+                    Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <controls:TrafficIndicator
+                    x:Name="UploadRateIndicator"
+                    Grid.Column="2"
+                    Margin="24,0,0,0"
+                    AccentBrush="{ThemeResource UploadAccentBrush}"
+                    Label="Upload"
+                    Value="--" />
+
+                <Grid
+                    x:Name="RuntimeSummaryGrid"
+                    Grid.Row="2"
+                    Grid.ColumnSpan="3"
+                    ColumnSpacing="16"
+                    SizeChanged="OnRuntimeSummarySizeChanged">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="196" />
+                        <ColumnDefinition Width="96" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="CompactSummaryGutter" Height="0" />
+                        <RowDefinition x:Name="CompactSummaryRow" Height="0" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="ModeLabel" Style="{StaticResource InlineMetricLabelStyle}" Text="Mode" />
+                        <toolkit:Segmented
+                            x:Name="ModeComboBox"
+                            Width="196"
+                            HorizontalAlignment="Left"
+                            AutomationProperties.HelpText="Choose the controller routing mode."
+                            AutomationProperties.LabeledBy="{x:Bind ModeLabel}"
+                            IsEnabled="False"
+                            ItemsSource="{x:Bind ModeOptions, Mode=OneWay}"
+                            SelectionChanged="OnModeSelectionChanged" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock x:Name="TunLabel" Style="{StaticResource InlineMetricLabelStyle}" Text="TUN" />
+                        <ToggleSwitch
+                            x:Name="TunToggle"
+                            HorizontalAlignment="Left"
+                            AutomationProperties.HelpText="Enable or disable the controller TUN interface."
+                            AutomationProperties.LabeledBy="{x:Bind TunLabel}"
+                            IsEnabled="False"
+                            OffContent="Off"
+                            OnContent="On"
+                            Toggled="OnTunToggled" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Connections" />
+                        <TextBlock x:Name="ConnectionCountText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel x:Name="MemorySummary" Grid.Column="3" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Memory" />
+                        <TextBlock x:Name="MemoryValueText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel x:Name="CoreSummary" Grid.Column="4" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Core" />
+                        <TextBlock
+                            x:Name="CoreVersionText"
+                            FontWeight="SemiBold"
+                            Text="--"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Grid
+            x:Name="TelemetryChartsGrid"
+            Grid.Row="5"
+            SizeChanged="OnTelemetryChartsSizeChanged">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="TrafficChartColumn" Width="*" />
+                <ColumnDefinition x:Name="TelemetryChartGutterColumn" Width="12" />
+                <ColumnDefinition x:Name="MemoryChartColumn" Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="TelemetryChartGutterRow" Height="0" />
+                <RowDefinition x:Name="MemoryChartRow" Height="0" />
+            </Grid.RowDefinitions>
+            <controls:TrendChart
+                x:Name="TrafficTrendChart"
+                PrimaryFillBrush="{ThemeResource DownloadAccentMutedBrush}"
+                PrimaryLabel="Download"
+                PrimaryStrokeBrush="{ThemeResource DownloadAccentBrush}"
+                SecondaryLabel="Upload"
+                SecondaryStrokeBrush="{ThemeResource UploadAccentBrush}"
+                IsSecondarySeriesVisible="True"
+                Title="Transfer rate" />
+            <controls:TrendChart
+                x:Name="MemoryTrendChart"
+                Grid.Column="2"
+                PrimaryFillBrush="{ThemeResource MemoryAccentMutedBrush}"
+                PrimaryLabel="Memory used"
+                PrimaryStrokeBrush="{ThemeResource MemoryAccentBrush}"
+                Title="Memory" />
+        </Grid>
+
+        <Border
+            x:Name="HonkStatisticsPanel"
+            Grid.Row="7"
+            Padding="18,14"
+            Style="{StaticResource DataPaneBorderStyle}"
+            Visibility="Collapsed">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="12" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock
+                            Style="{StaticResource SectionTitleTextBlockStyle}"
+                            Text="Outbound runtime statistics" />
+                        <TextBlock
+                            x:Name="HonkStatisticsStatusText"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Waiting for the first runtime statistics sample..."
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <Button
+                        x:Name="RefreshHonkStatisticsButton"
+                        Grid.Column="1"
+                        AutomationProperties.Name="Refresh outbound runtime statistics"
+                        Click="OnRefreshHonkStatisticsClicked"
+                        IsEnabled="False"
+                        Padding="8"
+                        ToolTipService.ToolTip="Refresh outbound runtime statistics"
+                        UseSystemFocusVisuals="True">
+                        <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Refresh" />
+                    </Button>
+                </Grid>
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Total connections" />
+                        <TextBlock x:Name="HonkTotalConnectionsText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Active" />
+                        <TextBlock x:Name="HonkActiveConnectionsText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Download" />
+                        <TextBlock x:Name="HonkDownloadText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Upload" />
+                        <TextBlock x:Name="HonkUploadText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="4" Spacing="2">
+                        <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Errors" />
+                        <TextBlock x:Name="HonkErrorsText" FontWeight="SemiBold" Text="--" />
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <Border
+            Grid.Row="9"
+            MinHeight="240"
+            Style="{StaticResource DataPaneBorderStyle}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Margin="16,14,16,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        Style="{StaticResource SectionTitleTextBlockStyle}"
+                        Text="Recent connections" />
+                    <Button
+                        Grid.Column="1"
+                        Click="OnOpenConnectionsClicked"
+                        Content="View all" />
+                </Grid>
+                <Grid
+                    Grid.Row="1"
+                    Padding="16,8"
+                    Background="{ThemeResource ControlFillColorDefaultBrush}"
+                    ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="92" />
+                        <ColumnDefinition Width="92" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource InlineMetricLabelStyle}" Text="Host" />
+                    <TextBlock Grid.Column="1" Style="{StaticResource InlineMetricLabelStyle}" Text="Network" />
+                    <TextBlock Grid.Column="2" Style="{StaticResource InlineMetricLabelStyle}" Text="Rule" />
+                    <TextBlock Grid.Column="3" Style="{StaticResource InlineMetricLabelStyle}" Text="Down/s" />
+                    <TextBlock Grid.Column="4" Style="{StaticResource InlineMetricLabelStyle}" Text="Up/s" />
+                </Grid>
+                <Grid Grid.Row="2">
+                    <ItemsRepeater
+                        x:Name="RecentConnectionsList"
+                        AutomationProperties.Name="Recent controller connections"
+                        ItemsSource="{x:Bind RecentConnections, Mode=OneWay}">
+                        <ItemsRepeater.Layout>
+                            <StackLayout />
+                        </ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="controls:RecentConnectionDisplayItem">
+                                <Border
+                                    AutomationProperties.AccessibilityView="Content"
+                                    AutomationProperties.Name="{x:Bind AccessibleDescription, Mode=OneWay}"
+                                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                    BorderThickness="0,0,0,1">
+                                    <Grid Padding="16,9" ColumnSpacing="8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="92" />
+                                            <ColumnDefinition Width="92" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Host, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Network, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Rule, Mode=OneWay}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3" AutomationProperties.AccessibilityView="Raw" Foreground="{ThemeResource DownloadAccentBrush}" Text="{x:Bind Download, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="4" AutomationProperties.AccessibilityView="Raw" Foreground="{ThemeResource UploadAccentBrush}" Text="{x:Bind Upload, Mode=OneWay}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
+                    <controls:EmptyState
+                        x:Name="RecentConnectionsEmptyState"
+                        Description="Live connections will appear after a backend session starts."
+                        IconGlyph="&#xE968;"
+                        StateTitle="No connection data" />
+                </Grid>
+            </Grid>
+        </Border>
+        </Grid>
+    </ScrollViewer>
+</Page>
