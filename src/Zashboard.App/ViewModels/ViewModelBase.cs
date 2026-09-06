@@ -20,6 +20,8 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     public bool IsBusy => _busyCount > 0;
 
+    public bool CanStartUserOperation => !Coordinator.IsUserOperationRunning;
+
     public string? ErrorMessage
     {
         get => _errorMessage;
@@ -34,8 +36,14 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    protected Task ExecuteAsync(
+        Func<CancellationToken, Task> action,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(action, allowCancellation: true, cancellationToken);
+
     protected async Task ExecuteAsync(
         Func<CancellationToken, Task> action,
+        bool allowCancellation,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -48,7 +56,7 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
         ErrorMessage = null;
         try
         {
-            await Coordinator.RunUserOperationAsync(action, cancellationToken);
+            await Coordinator.RunUserOperationAsync(action, allowCancellation, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -71,6 +79,11 @@ public abstract partial class ViewModelBase : ObservableObject, IDisposable
 
     private void OnCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
+        if (args.PropertyName == nameof(AppSessionCoordinator.IsUserOperationRunning))
+        {
+            OnPropertyChanged(nameof(CanStartUserOperation));
+        }
+
         HandleCoordinatorPropertyChanged(args.PropertyName);
     }
 

@@ -136,10 +136,13 @@ public sealed class BackendSessionFactory : IBackendSessionFactory
         }
         catch (ClashApiException exception)
         {
+            BackendConnectionState state = (int?)exception.StatusCode is null or 408 or 429 or >= 500 and <= 599
+                ? BackendConnectionState.OfflineRetrying
+                : BackendConnectionState.Degraded;
             session.UpdateSnapshot(FailureSnapshot(
                 epoch,
                 profile.Id,
-                BackendConnectionState.OfflineRetrying,
+                state,
                 exception.Message,
                 capabilities));
         }

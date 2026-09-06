@@ -12,6 +12,7 @@
     <Compile Include="..\..\src\Zashboard.App\Controls\DisplayModels.cs" Link="Production\DisplayModels.cs" />
     <Compile Include="..\..\src\Zashboard.App\Services\AppSettingsState.cs" Link="Production\AppSettingsState.cs" />
     <Compile Include="..\..\src\Zashboard.App\Services\AppSessionCoordinator.cs" Link="Production\AppSessionCoordinator.cs" />
+    <Compile Include="..\..\src\Zashboard.App\Services\AppSessionCoordinator.ResourceLoading.cs" Link="Production\AppSessionCoordinator.ResourceLoading.cs" />
     <Compile Include="..\..\src\Zashboard.App\Services\AppSessionModels.cs" Link="Production\AppSessionModels.cs" />
     <Compile Include="..\..\src\Zashboard.App\Services\IUiDispatcher.cs" Link="Production\IUiDispatcher.cs" />
     <Compile Include="..\..\src\Zashboard.App\ViewModels\ConnectionsViewModel.cs" Link="Production\ConnectionsViewModel.cs" />

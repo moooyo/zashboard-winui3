@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
 using Zashboard.App.Controls;
+using Zashboard.App.ViewModels;
 
 namespace Zashboard.App.Views;
 
@@ -127,7 +128,8 @@ public sealed partial class ProxiesPage : Page
 
     private void OnProxyRightTapped(object sender, RightTappedRoutedEventArgs args)
     {
-        if (sender is FrameworkElement
+        if (ViewModel is ViewModelBase { CanStartUserOperation: true } &&
+            sender is FrameworkElement
             {
                 DataContext: ProxyNodeDisplayItem { CanTest: true } proxy,
             } &&

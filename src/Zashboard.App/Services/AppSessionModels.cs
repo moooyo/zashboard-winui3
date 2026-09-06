@@ -31,6 +31,14 @@ public enum BackendCredentialUpdate
     Remove,
 }
 
+public enum BackendProfilesLoadState
+{
+    NotLoaded,
+    Empty,
+    Loaded,
+    Failed,
+}
+
 public sealed record BackendSaveRequest(
     Guid? ProfileId,
     string Name,

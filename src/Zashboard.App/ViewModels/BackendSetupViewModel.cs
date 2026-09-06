@@ -53,6 +53,7 @@ public sealed partial class BackendSetupViewModel : ViewModelBase
                         credentialUpdate),
                     token);
             },
+            allowCancellation: false,
             cancellationToken);
         return savedProfileId;
     }
@@ -62,6 +63,7 @@ public sealed partial class BackendSetupViewModel : ViewModelBase
         CancellationToken cancellationToken = default) =>
         ExecuteAsync(
             token => Coordinator.ActivateProfileAsync(ParseProfileId(backendId), token),
+            allowCancellation: false,
             cancellationToken);
 
     public async Task<bool> RemoveAsync(
@@ -77,6 +79,7 @@ public sealed partial class BackendSetupViewModel : ViewModelBase
                 await Coordinator.RemoveProfileAsync(profileId, token);
                 removed = existed && Coordinator.Profiles.All(profile => profile.Id != profileId);
             },
+            allowCancellation: false,
             cancellationToken);
         return removed;
     }

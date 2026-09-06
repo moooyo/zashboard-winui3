@@ -157,45 +157,51 @@
                                                     Grid.Column="1"
                                                     Orientation="Horizontal"
                                                     Spacing="4">
-                                                    <Button
-                                                        Width="40"
-                                                        Height="40"
-                                                        Padding="0"
-                                                        AutomationProperties.Name="{x:Bind ClearFixedActionName}"
-                                                        Click="OnClearFixedProxyClicked"
-                                                        IsEnabled="{x:Bind CanClearFixedProxy, Mode=OneWay}"
-                                                        Tag="{x:Bind Name}"
-                                                        ToolTipService.ToolTip="{x:Bind ClearFixedActionName}"
-                                                        UseSystemFocusVisuals="True"
-                                                        Visibility="{x:Bind HasFixedProxy, Mode=OneWay}">
-                                                        <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Clear" />
-                                                    </Button>
+                                                    <controls:UserOperationScope Visibility="{x:Bind HasFixedProxy, Mode=OneWay}">
+                                                        <Button
+                                                            Width="40"
+                                                            Height="40"
+                                                            Padding="0"
+                                                            AutomationProperties.Name="{x:Bind ClearFixedActionName}"
+                                                            Click="OnClearFixedProxyClicked"
+                                                            IsEnabled="{x:Bind CanClearFixedProxy, Mode=OneWay}"
+                                                            Tag="{x:Bind Name}"
+                                                            ToolTipService.ToolTip="{x:Bind ClearFixedActionName}"
+                                                            UseSystemFocusVisuals="True"
+                                                            Visibility="{x:Bind HasFixedProxy, Mode=OneWay}">
+                                                            <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Clear" />
+                                                        </Button>
+                                                    </controls:UserOperationScope>
                                                     <StackPanel
                                                         Orientation="Horizontal"
                                                         Spacing="4"
                                                         Visibility="{x:Bind IsSmart, Mode=OneWay}">
-                                                        <Button
-                                                            Width="40"
-                                                            Height="40"
-                                                            Padding="0"
-                                                            AutomationProperties.Name="{x:Bind RefreshSmartActionName}"
-                                                            Click="OnRefreshSmartWeightsClicked"
-                                                            IsEnabled="{x:Bind CanRefreshSmartWeights, Mode=OneWay}"
-                                                            ToolTipService.ToolTip="{x:Bind RefreshSmartActionName}"
-                                                            UseSystemFocusVisuals="True">
-                                                            <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Refresh" />
-                                                        </Button>
-                                                        <Button
-                                                            Width="40"
-                                                            Height="40"
-                                                            Padding="0"
-                                                            AutomationProperties.Name="{x:Bind ResetSmartActionName}"
-                                                            Click="OnResetSmartWeightsClicked"
-                                                            IsEnabled="{x:Bind CanResetSmartWeights, Mode=OneWay}"
-                                                            ToolTipService.ToolTip="{x:Bind ResetSmartActionName}"
-                                                            UseSystemFocusVisuals="True">
-                                                            <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="15" Glyph="&#xE777;" />
-                                                        </Button>
+                                                        <controls:UserOperationScope>
+                                                            <Button
+                                                                Width="40"
+                                                                Height="40"
+                                                                Padding="0"
+                                                                AutomationProperties.Name="{x:Bind RefreshSmartActionName}"
+                                                                Click="OnRefreshSmartWeightsClicked"
+                                                                IsEnabled="{x:Bind CanRefreshSmartWeights, Mode=OneWay}"
+                                                                ToolTipService.ToolTip="{x:Bind RefreshSmartActionName}"
+                                                                UseSystemFocusVisuals="True">
+                                                                <SymbolIcon AutomationProperties.AccessibilityView="Raw" Symbol="Refresh" />
+                                                            </Button>
+                                                        </controls:UserOperationScope>
+                                                        <controls:UserOperationScope>
+                                                            <Button
+                                                                Width="40"
+                                                                Height="40"
+                                                                Padding="0"
+                                                                AutomationProperties.Name="{x:Bind ResetSmartActionName}"
+                                                                Click="OnResetSmartWeightsClicked"
+                                                                IsEnabled="{x:Bind CanResetSmartWeights, Mode=OneWay}"
+                                                                ToolTipService.ToolTip="{x:Bind ResetSmartActionName}"
+                                                                UseSystemFocusVisuals="True">
+                                                                <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="15" Glyph="&#xE777;" />
+                                                            </Button>
+                                                        </controls:UserOperationScope>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </Grid>
@@ -260,91 +266,93 @@
                                                             Background="Transparent"
                                                             RightTapped="OnProxyRightTapped"
                                                             ToolTipService.ToolTip="{x:Bind InteractionHelpText, Mode=OneWay}">
-                                                            <ToggleButton
-                                                                HorizontalAlignment="Stretch"
-                                                                HorizontalContentAlignment="Stretch"
-                                                                VerticalContentAlignment="Stretch"
-                                                                Padding="10,7"
-                                                                AutomationProperties.HelpText="{x:Bind InteractionHelpText, Mode=OneWay}"
-                                                                AutomationProperties.ItemStatus="{x:Bind SelectionStatus, Mode=OneWay}"
-                                                                AutomationProperties.Name="{x:Bind SelectActionName, Mode=OneWay}"
-                                                                Click="OnSelectProxyClicked"
-                                                                IsChecked="{x:Bind IsCurrent, Mode=OneWay}"
-                                                                IsEnabled="{x:Bind CanSelect, Mode=OneWay}"
-                                                                IsHitTestVisible="{x:Bind CanSelect, Mode=OneWay}"
-                                                                UseSystemFocusVisuals="True">
-                                                                <Grid>
-                                                                    <Grid.RowDefinitions>
-                                                                        <RowDefinition Height="Auto" />
-                                                                        <RowDefinition Height="Auto" />
-                                                                        <RowDefinition Height="Auto" />
-                                                                    </Grid.RowDefinitions>
-                                                                    <Grid ColumnSpacing="6">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="Auto" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <TextBlock
-                                                                            AutomationProperties.AccessibilityView="Raw"
-                                                                            FontWeight="SemiBold"
-                                                                            Text="{x:Bind Name}"
-                                                                            TextTrimming="CharacterEllipsis" />
-                                                                        <TextBlock
-                                                                            Grid.Column="1"
-                                                                            AutomationProperties.AccessibilityView="Raw"
-                                                                            FontSize="11"
-                                                                            Text="Current"
-                                                                            Visibility="{x:Bind IsCurrent, Mode=OneWay}" />
-                                                                    </Grid>
-                                                                    <Grid Grid.Row="1" Margin="0,3,0,0" ColumnSpacing="4">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="Auto" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <TextBlock
-                                                                            AutomationProperties.AccessibilityView="Raw"
-                                                                            FontSize="11"
-                                                                            Opacity="0.78"
-                                                                            Text="{x:Bind Type, Mode=OneWay}"
-                                                                            TextTrimming="CharacterEllipsis" />
-                                                                        <StackPanel
-                                                                            Grid.Column="1"
-                                                                            Orientation="Horizontal"
-                                                                            Spacing="2"
-                                                                            Visibility="{x:Bind ShowSmartMetrics, Mode=OneWay}">
-                                                                            <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Opacity="0.78" Text="R" />
-                                                                            <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Text="{x:Bind Rank, Mode=OneWay}" />
-                                                                            <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Opacity="0.78" Text="W" />
-                                                                            <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Text="{x:Bind Weight, Mode=OneWay}" />
-                                                                        </StackPanel>
-                                                                    </Grid>
-                                                                    <Grid Grid.Row="2" Margin="0,4,0,0">
-                                                                        <Grid.ColumnDefinitions>
-                                                                            <ColumnDefinition Width="*" />
-                                                                            <ColumnDefinition Width="Auto" />
-                                                                        </Grid.ColumnDefinitions>
-                                                                        <TextBlock
-                                                                            AutomationProperties.AccessibilityView="Raw"
-                                                                            FontSize="11"
-                                                                            Opacity="0.78"
-                                                                            Text="{x:Bind Availability, Mode=OneWay}" />
-                                                                        <StackPanel
-                                                                            Grid.Column="1"
-                                                                            Orientation="Horizontal"
-                                                                            Spacing="3">
-                                                                            <FontIcon
+                                                            <controls:UserOperationScope HorizontalAlignment="Stretch">
+                                                                <ToggleButton
+                                                                    HorizontalAlignment="Stretch"
+                                                                    HorizontalContentAlignment="Stretch"
+                                                                    VerticalContentAlignment="Stretch"
+                                                                    Padding="10,7"
+                                                                    AutomationProperties.HelpText="{x:Bind InteractionHelpText, Mode=OneWay}"
+                                                                    AutomationProperties.ItemStatus="{x:Bind SelectionStatus, Mode=OneWay}"
+                                                                    AutomationProperties.Name="{x:Bind SelectActionName, Mode=OneWay}"
+                                                                    Click="OnSelectProxyClicked"
+                                                                    IsChecked="{x:Bind IsCurrent, Mode=OneWay}"
+                                                                    IsEnabled="{x:Bind CanSelect, Mode=OneWay}"
+                                                                    IsHitTestVisible="{x:Bind CanSelect, Mode=OneWay}"
+                                                                    UseSystemFocusVisuals="True">
+                                                                    <Grid>
+                                                                        <Grid.RowDefinitions>
+                                                                            <RowDefinition Height="Auto" />
+                                                                            <RowDefinition Height="Auto" />
+                                                                            <RowDefinition Height="Auto" />
+                                                                        </Grid.RowDefinitions>
+                                                                        <Grid ColumnSpacing="6">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock
                                                                                 AutomationProperties.AccessibilityView="Raw"
-                                                                                FontSize="10"
-                                                                                Glyph="&#xE945;"
-                                                                                Visibility="{x:Bind CanTest, Mode=OneWay}" />
+                                                                                FontWeight="SemiBold"
+                                                                                Text="{x:Bind Name}"
+                                                                                TextTrimming="CharacterEllipsis" />
+                                                                            <TextBlock
+                                                                                Grid.Column="1"
+                                                                                AutomationProperties.AccessibilityView="Raw"
+                                                                                FontSize="11"
+                                                                                Text="Current"
+                                                                                Visibility="{x:Bind IsCurrent, Mode=OneWay}" />
+                                                                        </Grid>
+                                                                        <Grid Grid.Row="1" Margin="0,3,0,0" ColumnSpacing="4">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
                                                                             <TextBlock
                                                                                 AutomationProperties.AccessibilityView="Raw"
                                                                                 FontSize="11"
-                                                                                Text="{x:Bind Latency, Mode=OneWay}" />
-                                                                        </StackPanel>
+                                                                                Opacity="0.78"
+                                                                                Text="{x:Bind Type, Mode=OneWay}"
+                                                                                TextTrimming="CharacterEllipsis" />
+                                                                            <StackPanel
+                                                                                Grid.Column="1"
+                                                                                Orientation="Horizontal"
+                                                                                Spacing="2"
+                                                                                Visibility="{x:Bind ShowSmartMetrics, Mode=OneWay}">
+                                                                                <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Opacity="0.78" Text="R" />
+                                                                                <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Text="{x:Bind Rank, Mode=OneWay}" />
+                                                                                <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Opacity="0.78" Text="W" />
+                                                                                <TextBlock AutomationProperties.AccessibilityView="Raw" FontSize="10" Text="{x:Bind Weight, Mode=OneWay}" />
+                                                                            </StackPanel>
+                                                                        </Grid>
+                                                                        <Grid Grid.Row="2" Margin="0,4,0,0">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock
+                                                                                AutomationProperties.AccessibilityView="Raw"
+                                                                                FontSize="11"
+                                                                                Opacity="0.78"
+                                                                                Text="{x:Bind Availability, Mode=OneWay}" />
+                                                                            <StackPanel
+                                                                                Grid.Column="1"
+                                                                                Orientation="Horizontal"
+                                                                                Spacing="3">
+                                                                                <FontIcon
+                                                                                    AutomationProperties.AccessibilityView="Raw"
+                                                                                    FontSize="10"
+                                                                                    Glyph="&#xE945;"
+                                                                                    Visibility="{x:Bind CanTest, Mode=OneWay}" />
+                                                                                <TextBlock
+                                                                                    AutomationProperties.AccessibilityView="Raw"
+                                                                                    FontSize="11"
+                                                                                    Text="{x:Bind Latency, Mode=OneWay}" />
+                                                                            </StackPanel>
+                                                                        </Grid>
                                                                     </Grid>
-                                                                </Grid>
-                                                            </ToggleButton>
+                                                                </ToggleButton>
+                                                            </controls:UserOperationScope>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -446,32 +454,36 @@
                                                 TextTrimming="CharacterEllipsis"
                                                 ToolTipService.ToolTip="{x:Bind UpdatedAt}" />
                                             <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4">
-                                                <Button
-                                                    MinWidth="40"
-                                                    MinHeight="40"
-                                                    AutomationProperties.HelpText="Request updated subscription data from this provider."
-                                                    AutomationProperties.Name="{x:Bind UpdateActionName}"
-                                                    Click="OnUpdateProviderClicked"
-                                                    IsEnabled="{x:Bind CanUpdate}"
-                                                    Padding="0"
-                                                    Tag="{x:Bind Name}"
-                                                    ToolTipService.ToolTip="{x:Bind UpdateActionName}"
-                                                    UseSystemFocusVisuals="True">
-                                                    <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE895;" />
-                                                </Button>
-                                                <Button
-                                                    MinWidth="40"
-                                                    MinHeight="40"
-                                                    AutomationProperties.HelpText="Run the configured health check for this provider."
-                                                    AutomationProperties.Name="{x:Bind CheckActionName}"
-                                                    Click="OnCheckProviderClicked"
-                                                    IsEnabled="{x:Bind CanCheck}"
-                                                    Padding="0"
-                                                    Tag="{x:Bind Name}"
-                                                    ToolTipService.ToolTip="{x:Bind CheckActionName}"
-                                                    UseSystemFocusVisuals="True">
-                                                    <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE9D9;" />
-                                                </Button>
+                                                <controls:UserOperationScope>
+                                                    <Button
+                                                        MinWidth="40"
+                                                        MinHeight="40"
+                                                        AutomationProperties.HelpText="Request updated subscription data from this provider."
+                                                        AutomationProperties.Name="{x:Bind UpdateActionName}"
+                                                        Click="OnUpdateProviderClicked"
+                                                        IsEnabled="{x:Bind CanUpdate}"
+                                                        Padding="0"
+                                                        Tag="{x:Bind Name}"
+                                                        ToolTipService.ToolTip="{x:Bind UpdateActionName}"
+                                                        UseSystemFocusVisuals="True">
+                                                        <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE895;" />
+                                                    </Button>
+                                                </controls:UserOperationScope>
+                                                <controls:UserOperationScope>
+                                                    <Button
+                                                        MinWidth="40"
+                                                        MinHeight="40"
+                                                        AutomationProperties.HelpText="Run the configured health check for this provider."
+                                                        AutomationProperties.Name="{x:Bind CheckActionName}"
+                                                        Click="OnCheckProviderClicked"
+                                                        IsEnabled="{x:Bind CanCheck}"
+                                                        Padding="0"
+                                                        Tag="{x:Bind Name}"
+                                                        ToolTipService.ToolTip="{x:Bind CheckActionName}"
+                                                        UseSystemFocusVisuals="True">
+                                                        <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE9D9;" />
+                                                    </Button>
+                                                </controls:UserOperationScope>
                                             </StackPanel>
                                         </Grid>
                                     </DataTemplate>

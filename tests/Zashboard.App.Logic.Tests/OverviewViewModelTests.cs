@@ -16,6 +16,46 @@ public sealed class OverviewViewModelTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
 
     [TestMethod]
+    public async Task InactiveRecentRowsDeferProjectionWhileTelemetryHistoryContinues()
+    {
+        (AppSessionCoordinator coordinator, FakeBackendSession session) =
+            await CreateCoordinatorAsync();
+        using OverviewViewModel viewModel = new(coordinator);
+        session.Streams.Connections.Publish(Snapshot(Connection("stable", "first.example")));
+        await WaitUntilAsync(() => viewModel.RecentConnections.Count == 1);
+        RecentConnectionDisplayItem row = viewModel.RecentConnections[0];
+        viewModel.SetActive(false);
+        List<NotifyCollectionChangedAction> actions = [];
+        viewModel.RecentConnections.CollectionChanged += (_, args) => actions.Add(args.Action);
+
+        session.Streams.Traffic.Publish(new ClashTrafficSample { Down = 4096, Up = 1024 });
+        session.Streams.Memory.Publish(new ClashMemorySample { InUse = 64 * 1024 * 1024 });
+        await Task.Delay(300);
+        session.Streams.Connections.Publish(Snapshot(
+            Connection("stable", "second.example"),
+            Connection("new", "third.example")));
+        await WaitUntilAsync(() =>
+            viewModel.ConnectionCount == "2" &&
+            viewModel.TrafficHistory.Count == 1 &&
+            viewModel.MemoryHistory.Count == 1);
+
+        Assert.AreEqual("first.example", row.Host);
+        Assert.IsEmpty(actions);
+        long trafficRevision = viewModel.TrafficRevision;
+        long memoryRevision = viewModel.MemoryRevision;
+        viewModel.SetActive(true);
+
+        Assert.HasCount(2, viewModel.RecentConnections);
+        Assert.AreSame(row, viewModel.RecentConnections[0]);
+        Assert.AreEqual("second.example", row.Host);
+        Assert.AreEqual(trafficRevision, viewModel.TrafficRevision);
+        Assert.AreEqual(memoryRevision, viewModel.MemoryRevision);
+        Assert.HasCount(1, viewModel.TrafficHistory);
+        Assert.HasCount(1, viewModel.MemoryHistory);
+        await coordinator.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task StableConnectionRowsUpdateInPlaceWithoutCollectionReset()
     {
         (AppSessionCoordinator coordinator, FakeBackendSession session) =

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Zashboard.Infrastructure.Clash.Serialization;
 
 namespace Zashboard.Infrastructure.Clash.Wire;
 
@@ -546,8 +547,14 @@ internal sealed class ConnectionStreamSnapshotDto : IJsonOnDeserialized
     [JsonPropertyName("memory")]
     public long Memory { get; set; }
 
-    void IJsonOnDeserialized.OnDeserialized() =>
-        WireContract.RequireItemsNotNull(Connections, "connections");
+    void IJsonOnDeserialized.OnDeserialized()
+    {
+        // Mihomo serializes an uninitialized connection slice as null when no connections exist.
+        if (Connections is not null)
+        {
+            WireContract.RequireItemsNotNull(Connections, "connections");
+        }
+    }
 }
 
 internal sealed class ConnectionDto : IJsonOnDeserialized
@@ -593,7 +600,8 @@ internal sealed class ConnectionDto : IJsonOnDeserialized
 internal sealed class ConnectionMetadataDto
 {
     [JsonPropertyName("destinationGeoIP")]
-    public string? DestinationGeoIp { get; set; }
+    [JsonConverter(typeof(StringOrStringArrayJsonConverter))]
+    public List<string>? DestinationGeoIp { get; set; }
 
     [JsonPropertyName("destinationIP")]
     public string? DestinationIp { get; set; }
@@ -641,7 +649,8 @@ internal sealed class ConnectionMetadataDto
     public string? SniffHost { get; set; }
 
     [JsonPropertyName("sourceGeoIP")]
-    public string? SourceGeoIp { get; set; }
+    [JsonConverter(typeof(StringOrStringArrayJsonConverter))]
+    public List<string>? SourceGeoIp { get; set; }
 
     [JsonPropertyName("sourceIP")]
     public string? SourceIp { get; set; }

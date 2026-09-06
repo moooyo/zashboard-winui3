@@ -200,14 +200,30 @@
                     IsClosable="True"
                     IsOpen="False" />
             </StackPanel>
-            <ProgressBar
-                x:Name="OperationProgressBar"
+            <Grid
+                x:Name="OperationProgressPanel"
                 Grid.Row="1"
                 Margin="16,4,16,0"
-                AutomationProperties.LiveSetting="Polite"
-                AutomationProperties.Name="Controller operation in progress"
-                IsIndeterminate="True"
-                Visibility="Collapsed" />
+                ColumnSpacing="12"
+                Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ProgressBar
+                    x:Name="OperationProgressBar"
+                    VerticalAlignment="Center"
+                    AutomationProperties.LiveSetting="Polite"
+                    AutomationProperties.Name="Controller operation in progress"
+                    IsIndeterminate="True" />
+                <Button
+                    x:Name="CancelOperationButton"
+                    Grid.Column="1"
+                    AutomationProperties.HelpText="Cancel the current controller operation. Completed changes are kept."
+                    Click="OnCancelOperationClicked"
+                    Content="Cancel operation"
+                    UseSystemFocusVisuals="True" />
+            </Grid>
             <Frame
                 x:Name="ContentFrame"
                 Grid.Row="2"

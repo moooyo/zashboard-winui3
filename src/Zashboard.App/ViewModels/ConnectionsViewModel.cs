@@ -13,6 +13,7 @@ namespace Zashboard.App.ViewModels;
 public sealed partial class ConnectionsViewModel : ViewModelBase
 {
     private string _query = string.Empty;
+    private bool _isActive = true;
     private bool _isPaused;
     private ConnectionStreamSnapshot? _renderedSnapshot;
     private ConnectionSessionRenderState _renderedSessionState;
@@ -30,7 +31,8 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
         RefreshConnections();
     }
 
-    public ObservableCollection<ConnectionDisplayItem> Connections { get; } = [];
+    public ObservableCollection<ConnectionDisplayItem> Connections { get; } =
+        new BulkObservableCollection<ConnectionDisplayItem>();
 
     public IAsyncRelayCommand RefreshCommand { get; }
 
@@ -57,6 +59,25 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
     }
 
     public int TotalCount => _renderedSnapshot?.Connections.Count ?? 0;
+
+    public void SetActive(bool isActive)
+    {
+        if (_isActive == isActive)
+        {
+            return;
+        }
+
+        _isActive = isActive;
+        if (isActive)
+        {
+            if (!IsPaused)
+            {
+                CaptureLatestSnapshot();
+            }
+
+            RefreshConnections();
+        }
+    }
 
     public Task RefreshAsync(CancellationToken cancellationToken = default)
     {
@@ -129,7 +150,7 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
     {
         if (propertyName == nameof(AppSessionCoordinator.ConnectionSnapshot))
         {
-            if (!IsPaused)
+            if (_isActive && !IsPaused)
             {
                 CaptureLatestSnapshot();
                 RefreshConnections();
@@ -151,6 +172,10 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
             if (epochChanged)
             {
                 SetRenderedSnapshot(null);
+                if (!_isActive)
+                {
+                    CollectionBatch.Replace(Connections, []);
+                }
             }
 
             // The page also uses this notification to refresh controller action state.
@@ -184,6 +209,11 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
 
     private void RefreshConnections()
     {
+        if (!_isActive)
+        {
+            return;
+        }
+
         _renderedSessionState = GetSessionRenderState();
         IEnumerable<ClashConnection> source = _renderedSnapshot?.Connections ?? [];
         if (Query.Length > 0)
@@ -248,6 +278,7 @@ public sealed partial class ConnectionsViewModel : ViewModelBase
             StringComparison.Ordinal));
 
     private bool CanActOnRenderedSnapshot() =>
+        _isActive &&
         !IsPaused &&
         Coordinator.HasActiveSession &&
         Coordinator.SessionSnapshot.State is

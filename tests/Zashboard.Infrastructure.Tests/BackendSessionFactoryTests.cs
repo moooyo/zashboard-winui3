@@ -53,6 +53,53 @@ public sealed class BackendSessionFactoryTests
     }
 
     [TestMethod]
+    [DataRow(400, BackendConnectionState.Degraded)]
+    [DataRow(404, BackendConnectionState.Degraded)]
+    [DataRow(405, BackendConnectionState.Degraded)]
+    [DataRow(422, BackendConnectionState.Degraded)]
+    [DataRow(408, BackendConnectionState.OfflineRetrying)]
+    [DataRow(429, BackendConnectionState.OfflineRetrying)]
+    [DataRow(500, BackendConnectionState.OfflineRetrying)]
+    [DataRow(502, BackendConnectionState.OfflineRetrying)]
+    [DataRow(503, BackendConnectionState.OfflineRetrying)]
+    public async Task VersionHttpFailureOnlyMarksTransientErrorsForRetry(
+        int statusCode,
+        BackendConnectionState expectedState)
+    {
+        BackendSessionFactory factory = CreateFactory(new DelegateHttpMessageHandler(
+            _ => new HttpResponseMessage((HttpStatusCode)statusCode)));
+
+        await using IBackendSession session = await factory.CreateAsync(
+            Profile,
+            new BackendCredential(string.Empty),
+            new SessionEpoch(18));
+
+        Assert.AreEqual(expectedState, session.Snapshot.State);
+        Assert.IsNull(session.Snapshot.LastSuccessfulContactAt);
+        Assert.IsTrue(session.Snapshot.StatusDetail?.Contains(
+            $"HTTP {statusCode}",
+            StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public async Task VersionTransportFailureWithoutStatusCreatesOfflineRetryingSession()
+    {
+        BackendSessionFactory factory = CreateFactory(new DelegateHttpMessageHandler(
+            _ => throw new HttpRequestException("The controller is not reachable.")));
+
+        await using IBackendSession session = await factory.CreateAsync(
+            Profile,
+            new BackendCredential(string.Empty),
+            new SessionEpoch(19));
+
+        Assert.AreEqual(BackendConnectionState.OfflineRetrying, session.Snapshot.State);
+        Assert.IsNull(session.Snapshot.LastSuccessfulContactAt);
+        Assert.AreEqual(
+            "The Clash API request failed before a response was received.",
+            session.Snapshot.StatusDetail);
+    }
+
+    [TestMethod]
     public async Task MalformedVersionResponseCreatesDegradedSession()
     {
         BackendSessionFactory factory = CreateFactory(new DelegateHttpMessageHandler(

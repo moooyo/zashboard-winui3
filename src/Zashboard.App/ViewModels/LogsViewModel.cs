@@ -12,6 +12,7 @@ public sealed record LogQuery(string Text, string Level);
 public sealed partial class LogsViewModel : ViewModelBase
 {
     private string _query = string.Empty;
+    private bool _isActive = true;
     private string _level = "all";
     private bool _isPaused;
     private bool _followTail = true;
@@ -83,6 +84,20 @@ public sealed partial class LogsViewModel : ViewModelBase
     {
         get => _droppedLogCount;
         private set => SetProperty(ref _droppedLogCount, value);
+    }
+
+    public void SetActive(bool isActive)
+    {
+        if (_isActive == isActive)
+        {
+            return;
+        }
+
+        _isActive = isActive;
+        if (isActive)
+        {
+            RefreshLogs();
+        }
     }
 
     public Task ClearAsync()
@@ -191,6 +206,16 @@ public sealed partial class LogsViewModel : ViewModelBase
             return;
         }
 
+        if (!_isActive)
+        {
+            if (args.IsReset)
+            {
+                RefreshLogs();
+            }
+
+            return;
+        }
+
         SourceEntryCount = Coordinator.Logs.Count;
         DroppedLogCount = Coordinator.DroppedLogCount;
         if (!args.IsReset && Query.Length == 0 && Level == "all")
@@ -219,6 +244,16 @@ public sealed partial class LogsViewModel : ViewModelBase
         DroppedLogCount = IsPaused
             ? _pausedDroppedLogCount
             : Coordinator.DroppedLogCount;
+        if (!_isActive)
+        {
+            if (snapshot.Count == 0 && LogEntries.Count > 0)
+            {
+                LogEntries.ReplaceAll([]);
+            }
+
+            return;
+        }
+
         ReplaceCollection(LogEntries, BuildDisplayEntries(snapshot));
     }
 

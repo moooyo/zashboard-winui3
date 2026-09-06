@@ -151,22 +151,23 @@ public sealed partial class SettingsPage : Page
         ArgumentNullException.ThrowIfNull(viewModel);
         _canPatchConfiguration = viewModel.CanPatchConfiguration;
         _listenerSettingsAvailabilityMessage = viewModel.ListenerSettingsStatus;
-        ApplyListenerSettingsButton.IsEnabled = viewModel.CanPatchConfiguration;
+        StartWithWindowsToggle.IsEnabled = viewModel.CanStartUserOperation;
+        ApplyListenerSettingsButton.IsEnabled = viewModel.CanPatchConfiguration && viewModel.CanStartUserOperation;
         HttpPortNumberBox.IsEnabled = viewModel.CanPatchConfiguration;
         SocksPortNumberBox.IsEnabled = viewModel.CanPatchConfiguration;
         RedirPortNumberBox.IsEnabled = viewModel.CanPatchConfiguration;
         TProxyPortNumberBox.IsEnabled = viewModel.CanPatchConfiguration;
         MixedPortNumberBox.IsEnabled = viewModel.CanPatchConfiguration;
         AllowLanToggle.IsEnabled = viewModel.CanPatchConfiguration;
-        ReloadConfigurationButton.IsEnabled = viewModel.CanReloadConfiguration;
-        UpdateConfigurationButton.IsEnabled = viewModel.CanUpdateConfiguration;
-        QueryDnsButton.IsEnabled = viewModel.HasControlSession;
-        FlushDnsCacheButton.IsEnabled = viewModel.HasControlSession;
-        FlushFakeIpCacheButton.IsEnabled = viewModel.HasControlSession;
-        UpdateGeoDataButton.IsEnabled = viewModel.CanUpdateGeoData;
-        RestartCoreButton.IsEnabled = viewModel.CanRestartCore;
-        UpgradeCoreButton.IsEnabled = viewModel.CanUpgradeCore;
-        ReprobeCapabilitiesButton.IsEnabled = viewModel.HasControlSession;
+        ReloadConfigurationButton.IsEnabled = viewModel.CanReloadConfiguration && viewModel.CanStartUserOperation;
+        UpdateConfigurationButton.IsEnabled = viewModel.CanUpdateConfiguration && viewModel.CanStartUserOperation;
+        QueryDnsButton.IsEnabled = viewModel.HasControlSession && viewModel.CanStartUserOperation;
+        FlushDnsCacheButton.IsEnabled = viewModel.HasControlSession && viewModel.CanStartUserOperation;
+        FlushFakeIpCacheButton.IsEnabled = viewModel.HasControlSession && viewModel.CanStartUserOperation;
+        UpdateGeoDataButton.IsEnabled = viewModel.CanUpdateGeoData && viewModel.CanStartUserOperation;
+        RestartCoreButton.IsEnabled = viewModel.CanRestartCore && viewModel.CanStartUserOperation;
+        UpgradeCoreButton.IsEnabled = viewModel.CanUpgradeCore && viewModel.CanStartUserOperation;
+        ReprobeCapabilitiesButton.IsEnabled = viewModel.HasControlSession && viewModel.CanStartUserOperation;
         ControllerConfigurationStatusText.Text = viewModel.ControllerConfigurationStatus;
         AutomationProperties.SetName(
             ControllerConfigurationStatusText,

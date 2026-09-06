@@ -26,6 +26,8 @@ public sealed partial class ShellPage : Page
 
     public event EventHandler<BackendSelectedEventArgs>? BackendActivationRequested;
 
+    public event EventHandler? CancelOperationRequested;
+
     public void SetBackendItemsSource(IEnumerable<BackendDisplayItem>? backends)
     {
         QuickBackendsList.ItemsSource = backends;
@@ -71,31 +73,24 @@ public sealed partial class ShellPage : Page
         OperationInfoBar.IsOpen = false;
     }
 
-    public void SetOperationInProgress(bool isRunning)
+    public void SetOperationInProgress(bool isRunning, bool canCancel, bool canWriteProfiles)
     {
+        OperationProgressPanel.Visibility = isRunning
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CancelOperationButton.IsEnabled = canCancel;
+        CancelOperationButton.Visibility = canCancel ? Visibility.Visible : Visibility.Collapsed;
+        QuickBackendsList.IsItemClickEnabled = !isRunning && canWriteProfiles;
+        QuickBackendsList.IsEnabled = !isRunning && canWriteProfiles;
         if (_isOperationInProgress == isRunning)
         {
-            ContentFrame.IsEnabled = !isRunning;
-            OperationProgressBar.Visibility = isRunning
-                ? Visibility.Visible
-                : Visibility.Collapsed;
             return;
         }
 
         _isOperationInProgress = isRunning;
-        if (isRunning)
-        {
-            BackendsFlyout.Hide();
-        }
-
-        ContentFrame.IsEnabled = !isRunning;
-        SetNavigationEnabled(!isRunning);
-        OperationProgressBar.Visibility = isRunning
-            ? Visibility.Visible
-            : Visibility.Collapsed;
         string status = isRunning
-            ? "Controller operation started. Page controls are temporarily unavailable."
-            : "Controller operation completed. Page controls are available.";
+            ? "Controller operation started. You can continue browsing pages."
+            : "Controller operation completed. Controller actions are available.";
         AutomationProperties.SetName(OperationProgressBar, status);
         AutomationProperties.SetItemStatus(
             OperationProgressBar,
@@ -129,11 +124,6 @@ public sealed partial class ShellPage : Page
 
     private void OnNavigationItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
     {
-        if (_isOperationInProgress)
-        {
-            return;
-        }
-
         if (args.IsSettingsInvoked)
         {
             Navigate(typeof(SettingsPage));
@@ -180,6 +170,11 @@ public sealed partial class ShellPage : Page
 
     private void OnQuickBackendClicked(object sender, ItemClickEventArgs args)
     {
+        if (!QuickBackendsList.IsItemClickEnabled)
+        {
+            return;
+        }
+
         BackendsFlyout.Hide();
         if (args.ClickedItem is BackendDisplayItem { IsActive: false } backend)
         {
@@ -202,6 +197,9 @@ public sealed partial class ShellPage : Page
     {
         Navigate(typeof(ConnectionsPage));
     }
+
+    private void OnCancelOperationClicked(object sender, RoutedEventArgs args) =>
+        CancelOperationRequested?.Invoke(this, EventArgs.Empty);
 
     private void SynchronizeNavigationSelection(Type pageType)
     {
@@ -245,20 +243,4 @@ public sealed partial class ShellPage : Page
         _ => null,
     };
 
-    private void SetNavigationEnabled(bool isEnabled)
-    {
-        foreach (NavigationViewItem item in RootNavigation.MenuItems
-            .Concat(RootNavigation.FooterMenuItems)
-            .OfType<NavigationViewItem>())
-        {
-            item.IsEnabled = isEnabled;
-        }
-
-        if (RootNavigation.SettingsItem is NavigationViewItem settingsItem)
-        {
-            settingsItem.IsEnabled = isEnabled;
-        }
-
-        RootNavigation.IsBackEnabled = false;
-    }
 }

@@ -223,6 +223,7 @@ public sealed partial class RulesPage : Page
                 ? rule.Enabled ? "Disable rule" : "Enable rule"
                 : string.Empty,
             CloseButtonText = "Close",
+            IsPrimaryButtonEnabled = ViewModel is ViewModelBase { CanStartUserOperation: true },
             DefaultButton = ContentDialogButton.Close,
         };
         AutomationProperties.SetName(dialog, rule.AccessibleDescription);
@@ -325,6 +326,11 @@ public sealed partial class RulesPage : Page
 
     private void RaiseRuleToggle(RuleDisplayItem rule, bool disabled)
     {
+        if (ViewModel is not ViewModelBase { CanStartUserOperation: true })
+        {
+            return;
+        }
+
         RuleToggleRequested?.Invoke(
             this,
             new RuleToggleRequestedEventArgs(rule.ApiIndex, rule.Identifier, disabled));

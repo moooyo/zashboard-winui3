@@ -75,7 +75,8 @@ public sealed partial class MainWindow : Window
         try
         {
             await _sessionCoordinator.RunUserOperationAsync(
-                _sessionCoordinator.InitializeAsync);
+                _sessionCoordinator.InitializeAsync,
+                allowCancellation: false);
             if (_sessionCoordinator.Profiles.Count == 0)
             {
                 Shell.Navigate(typeof(BackendSetupPage));
@@ -157,6 +158,13 @@ public sealed partial class MainWindow : Window
             !_sessionCoordinator.IsUserOperationRunning;
         reconnectItem.Click += async (_, _) => await ReconnectFromTrayAsync();
         flyout.Items.Add(reconnectItem);
+
+        if (_sessionCoordinator.CanCancelUserOperation)
+        {
+            MenuFlyoutItem cancelItem = new() { Text = "Cancel operation" };
+            cancelItem.Click += (_, _) => _sessionCoordinator.CancelUserOperation();
+            flyout.Items.Add(cancelItem);
+        }
 
         flyout.Items.Add(new MenuFlyoutSeparator());
 

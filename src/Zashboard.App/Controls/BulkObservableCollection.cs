@@ -133,6 +133,8 @@ internal static class CollectionBatch
 
 internal static class CollectionSynchronizer
 {
+    private const int MaximumIncrementalChanges = 64;
+
     public static void ReconcileByKey<T, TKey>(
         ObservableCollection<T> destination,
         IReadOnlyList<T> source,
@@ -146,41 +148,202 @@ internal static class CollectionSynchronizer
         ArgumentNullException.ThrowIfNull(updateExisting);
 
         EqualityComparer<TKey> comparer = EqualityComparer<TKey>.Default;
+        if (destination.Count == source.Count &&
+            KeysMatchInOrder(destination, source, keySelector, comparer))
+        {
+            for (int index = 0; index < source.Count; index++)
+            {
+                updateExisting(destination[index], source[index]);
+            }
+
+            return;
+        }
+
+        // Link occurrences by index so duplicate keys retain distinct existing objects.
+        Dictionary<TKey, int> available = new(destination.Count, comparer);
+        int[] nextOccurrence = new int[destination.Count];
+        for (int index = destination.Count - 1; index >= 0; index--)
+        {
+            TKey key = keySelector(destination[index]);
+            nextOccurrence[index] = available.TryGetValue(key, out int next) ? next : -1;
+            available[key] = index;
+        }
+
+        T[] reconciled = new T[source.Count];
+        int[] sourceIndices = new int[source.Count];
+        bool[] retained = new bool[destination.Count];
+        int retainedCount = 0;
         for (int index = 0; index < source.Count; index++)
         {
             T desired = source[index];
-            TKey desiredKey = keySelector(desired);
-            if (index < destination.Count &&
-                comparer.Equals(keySelector(destination[index]), desiredKey))
+            TKey key = keySelector(desired);
+            if (available.TryGetValue(key, out int existingIndex))
             {
-                updateExisting(destination[index], desired);
-                continue;
-            }
-
-            int existingIndex = -1;
-            for (int candidate = index + 1; candidate < destination.Count; candidate++)
-            {
-                if (comparer.Equals(keySelector(destination[candidate]), desiredKey))
+                if (nextOccurrence[existingIndex] < 0)
                 {
-                    existingIndex = candidate;
-                    break;
+                    available.Remove(key);
                 }
-            }
+                else
+                {
+                    available[key] = nextOccurrence[existingIndex];
+                }
 
-            if (existingIndex >= 0)
-            {
-                destination.Move(existingIndex, index);
-                updateExisting(destination[index], desired);
+                reconciled[index] = destination[existingIndex];
+                sourceIndices[index] = existingIndex;
+                retained[existingIndex] = true;
+                retainedCount++;
             }
             else
             {
-                destination.Insert(index, desired);
+                reconciled[index] = desired;
+                sourceIndices[index] = ~index;
             }
         }
 
-        while (destination.Count > source.Count)
+        List<CollectionChange>? changes = PlanChanges(sourceIndices, retained, retainedCount);
+        for (int index = 0; index < reconciled.Length; index++)
         {
-            destination.RemoveAt(destination.Count - 1);
+            if (sourceIndices[index] >= 0)
+            {
+                updateExisting(reconciled[index], source[index]);
+            }
+        }
+
+        if (changes is null)
+        {
+            CollectionBatch.Replace(destination, reconciled);
+            return;
+        }
+
+        foreach (CollectionChange change in changes)
+        {
+            switch (change.Action)
+            {
+                case NotifyCollectionChangedAction.Remove:
+                    destination.RemoveAt(change.Index);
+                    break;
+                case NotifyCollectionChangedAction.Add:
+                    destination.Insert(change.Index, reconciled[change.Index]);
+                    break;
+                case NotifyCollectionChangedAction.Move:
+                    destination.Move(change.OldIndex, change.Index);
+                    break;
+            }
         }
     }
+
+    private static bool KeysMatchInOrder<T, TKey>(
+        ObservableCollection<T> destination,
+        IReadOnlyList<T> source,
+        Func<T, TKey> keySelector,
+        EqualityComparer<TKey> comparer)
+    {
+        for (int index = 0; index < source.Count; index++)
+        {
+            if (!comparer.Equals(keySelector(destination[index]), keySelector(source[index])))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static List<CollectionChange>? PlanChanges(
+        int[] sourceIndices,
+        bool[] retained,
+        int retainedCount)
+    {
+        int structuralChanges = retained.Length - retainedCount + sourceIndices.Length - retainedCount;
+        if (structuralChanges > MaximumIncrementalChanges)
+        {
+            return null;
+        }
+
+        // Bound both notifications and backing-array work before changing the live collection.
+        // A large reorder or deletion uses one bulk reset, while small edits remain incremental.
+        long remainingWork = Math.Max(256L, ((long)retained.Length + sourceIndices.Length) * 4);
+        List<CollectionChange> changes = [];
+        int count = retained.Length;
+        for (int index = retained.Length - 1; index >= 0; index--)
+        {
+            if (retained[index])
+            {
+                continue;
+            }
+
+            remainingWork -= count - index - 1;
+            if (remainingWork < 0)
+            {
+                return null;
+            }
+
+            changes.Add(new(NotifyCollectionChangedAction.Remove, index));
+            count--;
+        }
+
+        List<int> working = new(Math.Max(retainedCount, sourceIndices.Length));
+        for (int index = 0; index < retained.Length; index++)
+        {
+            if (retained[index])
+            {
+                working.Add(index);
+            }
+        }
+
+        for (int index = 0; index < sourceIndices.Length; index++)
+        {
+            int desired = sourceIndices[index];
+            if (index < working.Count && working[index] == desired)
+            {
+                continue;
+            }
+
+            if (changes.Count >= MaximumIncrementalChanges)
+            {
+                return null;
+            }
+
+            if (desired < 0)
+            {
+                remainingWork -= working.Count - index;
+                if (remainingWork < 0)
+                {
+                    return null;
+                }
+
+                changes.Add(new(NotifyCollectionChangedAction.Add, index));
+                working.Insert(index, desired);
+                continue;
+            }
+
+            int existingIndex = index + 1;
+            while (working[existingIndex] != desired)
+            {
+                if (--remainingWork < 0)
+                {
+                    return null;
+                }
+
+                existingIndex++;
+            }
+
+            remainingWork -= (long)working.Count * 2 - existingIndex - index - 2;
+            if (remainingWork < 0)
+            {
+                return null;
+            }
+
+            changes.Add(new(NotifyCollectionChangedAction.Move, index, existingIndex));
+            working.RemoveAt(existingIndex);
+            working.Insert(index, desired);
+        }
+
+        return changes;
+    }
+
+    private readonly record struct CollectionChange(
+        NotifyCollectionChangedAction Action,
+        int Index,
+        int OldIndex = -1);
 }

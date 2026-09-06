@@ -21,6 +21,7 @@ public sealed partial class OverviewViewModel : ViewModelBase
 
     private static readonly string[] DefaultModes = ["direct", "rule", "global"];
 
+    private bool _isActive = true;
     private string _sessionState = "No backend";
     private string _mode = "--";
     private string _connectionCount = "--";
@@ -229,6 +230,20 @@ public sealed partial class OverviewViewModel : ViewModelBase
         private set => SetProperty(ref _honkErrors, value);
     }
 
+    public void SetActive(bool isActive)
+    {
+        if (_isActive == isActive)
+        {
+            return;
+        }
+
+        _isActive = isActive;
+        if (isActive)
+        {
+            RefreshRecentConnections(Coordinator.ConnectionSnapshot);
+        }
+    }
+
     public Task RefreshAsync(CancellationToken cancellationToken = default) =>
         ExecuteAsync(token => Coordinator.RefreshAsync(token), cancellationToken);
 
@@ -377,6 +392,15 @@ public sealed partial class OverviewViewModel : ViewModelBase
 
         RefreshTransferTotals();
 
+        // Keep telemetry history current while deferring the offscreen row projection.
+        if (_isActive || connections is null)
+        {
+            RefreshRecentConnections(connections);
+        }
+    }
+
+    private void RefreshRecentConnections(ConnectionStreamSnapshot? connections)
+    {
         IReadOnlyDictionary<string, ConnectionTransferRate> transferRates =
             connections?.TransferRates ??
             new Dictionary<string, ConnectionTransferRate>(StringComparer.Ordinal);

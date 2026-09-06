@@ -17,13 +17,17 @@
 3. Probe `/version`, create a session-bound REST client and four stream subscriptions.
 4. Load configuration, proxies, providers, rules, and rule providers concurrently.
 5. Probe response-driven Smart and runtime-statistics extensions, then poll supported runtime statistics on a separate five-second timer.
-6. Publish state only after checking the epoch before and on the UI dispatcher.
+6. Publish state only after checking the epoch before and on the UI dispatcher. REST resources also use a monotonically increasing request revision, so an older request in the same session cannot replace newer data or publish a stale failure.
 7. Keep log data bounded, publish log deltas to the view model, and throttle connection, traffic, and memory updates before touching UI collections.
 8. Normalize per-connection counter deltas by the measured sample interval and retain both rates and cumulative totals for presentation.
 
-The UI state is explicit: `NoBackend`, `Connecting`, `Online`, `Degraded`, `Unauthorized`, and `OfflineRetrying`. A single failed stream degrades the session without discarding the last known snapshot. Switching backends clears all volatile state immediately.
+The UI state is explicit: `NoBackend`, `Connecting`, `Online`, `Degraded`, `Unauthorized`, and `OfflineRetrying`. A single failed stream degrades the session without discarding the last known snapshot. Switching backends clears all volatile state immediately. Failed transient version and required-resource reads retry in the session lifetime, starting after two seconds and backing off to thirty seconds. Authentication failures stop recovery, while permanent HTTP and protocol failures require explicit user action. Canceling a newer refresh preserves recovery for resources that have never loaded.
 
-Startup and user-triggered controller mutations share one cancellable operation gate. Profile changes keep the `profile -> session` lock order through persistence and session replacement, while shutdown cancels the shared lifetime token and drains initialization, profile, refresh, and session work before disposing the host.
+Startup and user-triggered controller mutations share one operation gate. Long controller operations expose cooperative cancellation while navigation, filtering, and local presentation controls remain available. Startup and profile transactions do not expose user cancellation. Profile changes keep the `profile -> session` lock order through persistence and session replacement, while shutdown cancels the shared lifetime token and drains initialization, profile, refresh, and session work before disposing the host.
+
+WebSocket handshakes and periodic telemetry messages have configurable deadlines. A deadline retries the stream with backoff; session and caller cancellation terminate it normally. Logs may remain idle indefinitely, but an incomplete log message has a deadline once its first fragment arrives. The client does not require PONG replies because supported controller routes may only write to the WebSocket.
+
+Connection and log view models retain their state while inactive, but defer display projection until their page becomes active. Overview telemetry history continues collecting off-screen. Collection reconciliation preserves retained item identities, removes expired keys first, and batches large changes instead of emitting an unbounded sequence of moves.
 
 WinUIEx is used through its standalone `TrayIcon` and AOT-safe window extension APIs. Window placement is persisted with strongly typed `AppWindow` coordinates and `ApplicationData`; `WindowManager` is intentionally not reachable because version 2.9.3 contains a reflection-based persistence path that is incompatible with the project's warning-free Native AOT contract. The tray's hidden window remains alive until asynchronous Host disposal completes.
 
@@ -43,6 +47,8 @@ The Windows x64 release job also publishes and directly executes `Zashboard.Nati
 ## Persistence
 
 Backend profile JSON contains endpoint metadata only and is written through an atomic temporary-file replacement. Credentials are stored separately in a versioned DPAPI envelope and can only be decrypted by the current Windows user.
+
+Profile loading distinguishes not loaded, empty, loaded, and failed states. A failed load never becomes a writable empty profile set: saving, activating, and removing profiles require a successful load. The backend page exposes a retry action while preserving the original file.
 
 Application preferences use packaged application local settings. Connection snapshots, traffic, and logs are intentionally not persisted.
 

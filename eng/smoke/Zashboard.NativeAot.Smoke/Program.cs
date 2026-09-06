@@ -49,6 +49,7 @@ internal static class Program
             await VerifyDependencyInjectionAndPersistenceAsync(rootDirectory).ConfigureAwait(false);
             await VerifyClashClientAsync().ConfigureAwait(false);
             await VerifyClashStreamAsync().ConfigureAwait(false);
+            await VerifyConnectionStreamsAsync().ConfigureAwait(false);
             Console.WriteLine(requireNativeAot ? NativeAotMarker : JitMarker);
             return 0;
         }
@@ -229,6 +230,59 @@ internal static class Program
                 status.State == ClashStreamState.Connected),
             "The WebSocket stream did not publish a connected state.");
     }
+
+    private static async Task VerifyConnectionStreamsAsync()
+    {
+        string[] payloads =
+        [
+            """{"connections":[{"id":"one","download":1,"upload":2,"metadata":{"sourceGeoIP":["CN"],"destinationGeoIP":["US","CA"]}}],"downloadTotal":10,"uploadTotal":20}""",
+            """{"connections":[{"id":"one","download":1,"upload":2,"metadata":{"sourceGeoIP":"CN","destinationGeoIP":null}}],"downloadTotal":10,"uploadTotal":20}""",
+            """{"connections":null,"downloadTotal":10,"uploadTotal":20}""",
+        ];
+
+        for (int index = 0; index < payloads.Length; index++)
+        {
+            await using SmokeWebSocketServer server = new(payloads[index]);
+            BackendProfile profile = new(
+                Guid.NewGuid(),
+                "Smoke connections controller",
+                BackendEndpoint.Create(server.Endpoint.AbsoluteUri));
+            ClashStreamClient client = new(
+                profile,
+                new BackendCredential(SmokeSecret),
+                new CapabilityRegistry(),
+                CancellationToken.None);
+            using CancellationTokenSource guard = new(TimeSpan.FromSeconds(10));
+            await using IAsyncEnumerator<ConnectionStreamSnapshot> enumerator = client
+                .StreamConnectionsAsync(guard.Token)
+                .GetAsyncEnumerator(guard.Token);
+
+            bool moved = await enumerator.MoveNextAsync().AsTask().WaitAsync(guard.Token)
+                .ConfigureAwait(false);
+            SmokeAssert.True(moved, "The connections stream completed before publishing a snapshot.");
+            ConnectionStreamSnapshot snapshot = enumerator.Current;
+            SmokeAssert.True(
+                snapshot.DownloadTotal == 10 && snapshot.UploadTotal == 20,
+                "The connections snapshot counters were not preserved.");
+            if (index == 2)
+            {
+                SmokeAssert.True(snapshot.Connections.Count == 0, "A null connection slice must be empty.");
+                continue;
+            }
+
+            SmokeAssert.True(snapshot.Connections.Count == 1, "The connections snapshot count was invalid.");
+            ClashConnectionMetadata metadata = snapshot.Connections[0].Metadata;
+            SmokeAssert.True(
+                metadata.SourceGeoIp.Count == 1 && metadata.SourceGeoIp[0] == "CN",
+                "GeoIP array and legacy string mapping failed.");
+            SmokeAssert.True(
+                index == 0
+                    ? metadata.DestinationGeoIp.Count == 2 &&
+                        metadata.DestinationGeoIp[0] == "US" && metadata.DestinationGeoIp[1] == "CA"
+                    : metadata.DestinationGeoIp.Count == 0,
+                "GeoIP array and null mapping failed.");
+        }
+    }
 }
 
 internal static class SmokeAssert
@@ -402,15 +456,26 @@ internal sealed class SmokeWebSocketServer : IAsyncDisposable
         CancellationToken cancellationToken)
     {
         byte[] payload = Encoding.UTF8.GetBytes(value);
-        if (payload.Length >= 126)
+        if (payload.Length > ushort.MaxValue)
         {
             throw new ArgumentOutOfRangeException(nameof(value));
         }
 
-        byte[] frame = new byte[payload.Length + 2];
+        int headerLength = payload.Length < 126 ? 2 : 4;
+        byte[] frame = new byte[payload.Length + headerLength];
         frame[0] = 0x81;
-        frame[1] = checked((byte)payload.Length);
-        payload.CopyTo(frame, 2);
+        if (payload.Length < 126)
+        {
+            frame[1] = checked((byte)payload.Length);
+        }
+        else
+        {
+            frame[1] = 126;
+            frame[2] = checked((byte)(payload.Length >> 8));
+            frame[3] = checked((byte)(payload.Length & 0xff));
+        }
+
+        payload.CopyTo(frame, headerLength);
         await stream.WriteAsync(frame, cancellationToken).ConfigureAwait(false);
         await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
     }

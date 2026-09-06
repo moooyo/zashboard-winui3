@@ -21,6 +21,8 @@ public sealed partial class BackendSetupPage : Page
     private bool _isReplacingBackends;
     private bool _isShowingAddressError;
     private bool _isUpdatingEditor;
+    private bool _isOperationInProgress;
+    private bool _canWriteProfiles;
     private string? _pendingRemovalBackendId;
     private int _pendingRemovalIndex = -1;
     private string? _selectedBackendId;
@@ -41,6 +43,8 @@ public sealed partial class BackendSetupPage : Page
 
     public event EventHandler<BackendSelectedEventArgs>? ActivateRequested;
 
+    public event EventHandler? RetryProfilesRequested;
+
     public BulkObservableCollection<BackendDisplayItem> SavedBackends { get; } = [];
 
     public object? ViewModel
@@ -48,6 +52,22 @@ public sealed partial class BackendSetupPage : Page
         get => DataContext;
         set => DataContext = value;
     }
+
+    public void ApplyOperationAvailability(bool isRunning, bool canWriteProfiles, string? profileLoadError)
+    {
+        _isOperationInProgress = isRunning;
+        _canWriteProfiles = canWriteProfiles;
+        ProfileLoadInfoBar.IsOpen = !string.IsNullOrWhiteSpace(profileLoadError);
+        ProfileLoadInfoBar.Message = profileLoadError is null
+            ? string.Empty
+            : $"{profileLoadError} Saving is disabled to protect the existing file. Retry loading after resolving the error.";
+        RetryProfilesButton.IsEnabled = !isRunning;
+        UpdateEditorState();
+        UpdateSelectionActions(SavedBackendsList.SelectedItem as BackendDisplayItem);
+    }
+
+    private void OnRetryProfilesClicked(object sender, RoutedEventArgs args) =>
+        RetryProfilesRequested?.Invoke(this, EventArgs.Empty);
 
     public void ShowMessage(string title, string message, InfoBarSeverity severity)
     {
@@ -447,7 +467,8 @@ public sealed partial class BackendSetupPage : Page
             out BackendEndpoint? endpoint,
             out _);
         bool credentialChoiceIsSafe = endpoint is not null && IsCredentialChoiceSafe(endpoint);
-        ConnectButton.IsEnabled = isValid && credentialChoiceIsSafe;
+        ConnectButton.IsEnabled = isValid && credentialChoiceIsSafe &&
+            !_isOperationInProgress && _canWriteProfiles;
         UpdateCredentialState(endpoint);
         UpdateConnectButtonPresentation();
     }
@@ -584,8 +605,10 @@ public sealed partial class BackendSetupPage : Page
 
     private void UpdateSelectionActions(BackendDisplayItem? backend)
     {
-        RemoveBackendButton.IsEnabled = backend is not null;
-        ActivateBackendButton.IsEnabled = backend is { IsActive: false };
+        RemoveBackendButton.IsEnabled = backend is not null &&
+            !_isOperationInProgress && _canWriteProfiles;
+        ActivateBackendButton.IsEnabled = backend is { IsActive: false } &&
+            !_isOperationInProgress && _canWriteProfiles;
     }
 
     private BackendCredentialUpdate GetCredentialUpdate()

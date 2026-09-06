@@ -343,7 +343,7 @@ internal static class ClashWireMapper
             StartValue = startValue,
             Metadata = new ClashConnectionMetadata
             {
-                DestinationGeoIp = metadata.DestinationGeoIp ?? string.Empty,
+                DestinationGeoIp = CleanStrings(metadata.DestinationGeoIp),
                 DestinationIp = metadata.DestinationIp ?? string.Empty,
                 DestinationIpAsn = metadata.DestinationIpAsn ?? string.Empty,
                 DestinationPort = metadata.DestinationPort ?? string.Empty,
@@ -359,7 +359,7 @@ internal static class ClashWireMapper
                 ProcessPath = metadata.ProcessPath ?? string.Empty,
                 RemoteDestination = metadata.RemoteDestination ?? string.Empty,
                 SniffHost = metadata.SniffHost ?? string.Empty,
-                SourceGeoIp = metadata.SourceGeoIp ?? string.Empty,
+                SourceGeoIp = CleanStrings(metadata.SourceGeoIp),
                 SourceIp = metadata.SourceIp ?? string.Empty,
                 SourceIpAsn = metadata.SourceIpAsn ?? string.Empty,
                 SourcePort = metadata.SourcePort ?? string.Empty,

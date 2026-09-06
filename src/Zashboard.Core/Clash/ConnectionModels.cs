@@ -10,7 +10,7 @@ public enum ClashNetworkKind
 
 public sealed record ClashConnectionMetadata
 {
-    public string DestinationGeoIp { get; init; } = string.Empty;
+    public IReadOnlyList<string> DestinationGeoIp { get; init; } = [];
 
     public string DestinationIp { get; init; } = string.Empty;
 
@@ -42,7 +42,7 @@ public sealed record ClashConnectionMetadata
 
     public string SniffHost { get; init; } = string.Empty;
 
-    public string SourceGeoIp { get; init; } = string.Empty;
+    public IReadOnlyList<string> SourceGeoIp { get; init; } = [];
 
     public string SourceIp { get; init; } = string.Empty;
 

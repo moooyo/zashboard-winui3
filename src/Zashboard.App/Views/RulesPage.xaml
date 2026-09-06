@@ -221,18 +221,20 @@
                                             VerticalAlignment="Center"
                                             AutomationProperties.AccessibilityView="Raw"
                                             Text="{x:Bind HitCount}" />
-                                        <ToggleButton
-                                            Grid.Column="5"
-                                            HorizontalAlignment="Stretch"
-                                            VerticalAlignment="Center"
-                                            AutomationProperties.HelpText="Turn off to disable this routing rule, or turn on to enable it."
-                                            AutomationProperties.Name="{x:Bind ToggleAccessibleName}"
-                                            Click="OnRuleToggleClicked"
-                                            Content="{x:Bind State}"
-                                            IsChecked="{x:Bind Enabled, Mode=OneTime}"
-                                            IsEnabled="{x:Bind CanToggle}"
-                                            ToolTipService.ToolTip="Enable or disable this routing rule"
-                                            UseSystemFocusVisuals="True" />
+                                        <controls:UserOperationScope Grid.Column="5" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                                            <ToggleButton
+                                                Grid.Column="5"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Center"
+                                                AutomationProperties.HelpText="Turn off to disable this routing rule, or turn on to enable it."
+                                                AutomationProperties.Name="{x:Bind ToggleAccessibleName}"
+                                                Click="OnRuleToggleClicked"
+                                                Content="{x:Bind State}"
+                                                IsChecked="{x:Bind Enabled, Mode=OneTime}"
+                                                IsEnabled="{x:Bind CanToggle}"
+                                                ToolTipService.ToolTip="Enable or disable this routing rule"
+                                                UseSystemFocusVisuals="True" />
+                                        </controls:UserOperationScope>
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
@@ -313,19 +315,21 @@
                                             <TextBlock Grid.Column="3" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind Format}" TextTrimming="CharacterEllipsis" />
                                             <TextBlock Grid.Column="4" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind RuleCount}" />
                                             <TextBlock Grid.Column="5" AutomationProperties.AccessibilityView="Raw" Text="{x:Bind UpdatedAt}" TextTrimming="CharacterEllipsis" />
-                                            <Button
-                                                Grid.Column="6"
-                                                HorizontalAlignment="Center"
-                                                AutomationProperties.HelpText="Fetch the latest rules from this provider."
-                                                AutomationProperties.Name="{x:Bind UpdateAccessibleName}"
-                                                Click="OnUpdateProviderClicked"
-                                                IsEnabled="{x:Bind CanUpdate}"
-                                                Padding="7"
-                                                Tag="{x:Bind Name}"
-                                                ToolTipService.ToolTip="Update rule provider"
-                                                UseSystemFocusVisuals="True">
-                                                <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE895;" />
-                                            </Button>
+                                            <controls:UserOperationScope Grid.Column="6" HorizontalAlignment="Center">
+                                                <Button
+                                                    Grid.Column="6"
+                                                    HorizontalAlignment="Center"
+                                                    AutomationProperties.HelpText="Fetch the latest rules from this provider."
+                                                    AutomationProperties.Name="{x:Bind UpdateAccessibleName}"
+                                                    Click="OnUpdateProviderClicked"
+                                                    IsEnabled="{x:Bind CanUpdate}"
+                                                    Padding="7"
+                                                    Tag="{x:Bind Name}"
+                                                    ToolTipService.ToolTip="Update rule provider"
+                                                    UseSystemFocusVisuals="True">
+                                                    <FontIcon AutomationProperties.AccessibilityView="Raw" FontSize="14" Glyph="&#xE895;" />
+                                                </Button>
+                                            </controls:UserOperationScope>
                                         </Grid>
                                     </DataTemplate>
                                 </ListView.ItemTemplate>

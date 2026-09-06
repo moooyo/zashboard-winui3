@@ -23,16 +23,34 @@
                 Title="Backends"
                 Subtitle="Connect to a local or remote Clash-compatible controller." />
 
-            <InfoBar
-                x:Name="BackendInfoBar"
+            <StackPanel
                 Grid.Row="1"
                 Margin="0,16,0,0"
-                AutomationProperties.LiveSetting="Polite"
-                IsClosable="True"
-                IsOpen="True"
-                Message="Add a controller before using proxies, connections, rules, or live traffic."
-                Severity="Informational"
-                Title="Backend required" />
+                Spacing="8">
+                <InfoBar
+                    x:Name="ProfileLoadInfoBar"
+                    AutomationProperties.LiveSetting="Polite"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Error"
+                    Title="Saved backends could not be loaded">
+                    <InfoBar.ActionButton>
+                        <Button
+                            x:Name="RetryProfilesButton"
+                            Click="OnRetryProfilesClicked"
+                            Content="Retry loading"
+                            UseSystemFocusVisuals="True" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
+                <InfoBar
+                    x:Name="BackendInfoBar"
+                    AutomationProperties.LiveSetting="Polite"
+                    IsClosable="True"
+                    IsOpen="True"
+                    Message="Add a controller before using proxies, connections, rules, or live traffic."
+                    Severity="Informational"
+                    Title="Backend required" />
+            </StackPanel>
 
             <Grid
                 Grid.Row="2"

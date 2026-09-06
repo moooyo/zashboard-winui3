@@ -40,6 +40,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Lock _profileStateGate = new();
     private readonly Lock _logIterationGate = new();
+    private readonly Lock _userCancellationGate = new();
     private readonly HashSet<Guid> _profilesWithStoredCredentials = [];
 
     private BackendProfileSet _profileSet = new();
@@ -63,6 +64,11 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
     private bool _isInitialized;
     private bool _isRefreshing;
     private bool _isUserOperationRunning;
+    private bool _canCancelUserOperation;
+    private BackendProfilesLoadState _profileLoadState;
+    private string? _profileLoadError;
+    private CancellationTokenSource? _userCancellationSource;
+    private Task _userCancellationTask = Task.CompletedTask;
     private long _epochValue;
     private long _nextLogSequence;
     private long _logGeneration;
@@ -215,6 +221,27 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         private set => SetProperty(ref _isInitialized, value);
     }
 
+    public BackendProfilesLoadState ProfileLoadState
+    {
+        get => _profileLoadState;
+        private set
+        {
+            if (SetProperty(ref _profileLoadState, value))
+            {
+                OnPropertyChanged(nameof(CanWriteProfiles));
+            }
+        }
+    }
+
+    public bool CanWriteProfiles => ProfileLoadState is
+        BackendProfilesLoadState.Empty or BackendProfilesLoadState.Loaded;
+
+    public string? ProfileLoadError
+    {
+        get => _profileLoadError;
+        private set => SetProperty(ref _profileLoadError, value);
+    }
+
     public bool IsRefreshing
     {
         get => _isRefreshing;
@@ -231,8 +258,46 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         private set => SetProperty(ref _isUserOperationRunning, value);
     }
 
+    public bool CanCancelUserOperation
+    {
+        get => _canCancelUserOperation;
+        private set => SetProperty(ref _canCancelUserOperation, value);
+    }
+
+    public void CancelUserOperation()
+    {
+        CancellationTokenSource? source;
+        lock (_userCancellationGate)
+        {
+            source = _userCancellationSource;
+            if (source is null || source.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _userCancellationTask = source.CancelAsync();
+        }
+
+        ObserveDispatch(_dispatcher.InvokeAsync(() =>
+        {
+            lock (_userCancellationGate)
+            {
+                if (ReferenceEquals(_userCancellationSource, source))
+                {
+                    CanCancelUserOperation = false;
+                }
+            }
+        }));
+    }
+
+    internal Task RunUserOperationAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken = default) =>
+        RunUserOperationAsync(operation, allowCancellation: true, cancellationToken);
+
     internal async Task RunUserOperationAsync(
         Func<CancellationToken, Task> operation,
+        bool allowCancellation,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
@@ -249,15 +314,25 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             linked.Token.ThrowIfCancellationRequested();
             ThrowIfDisposed();
             operationSession = ActiveSession;
+            lock (_userCancellationGate)
+            {
+                _userCancellationSource = allowCancellation ? linked : null;
+                _userCancellationTask = Task.CompletedTask;
+            }
             await _dispatcher.InvokeAsync(
                 () =>
                 {
                     IsUserOperationRunning = true;
+                    CanCancelUserOperation = allowCancellation && !linked.IsCancellationRequested;
                     LastUserOperationErrorMessage = null;
                 },
                 CancellationToken.None)
                 .ConfigureAwait(false);
             await operation(linked.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (linked.IsCancellationRequested)
+        {
+            throw new OperationCanceledException("The controller operation was canceled.", exception, linked.Token);
         }
         catch (ClashAuthenticationException exception)
         {
@@ -289,8 +364,30 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             {
                 try
                 {
+                    Task cancellationTask;
+                    lock (_userCancellationGate)
+                    {
+                        _userCancellationSource = null;
+                        cancellationTask = _userCancellationTask;
+                    }
+
+                    try
+                    {
+                        await cancellationTask.ConfigureAwait(false);
+                    }
+                    catch (Exception exception)
+                    {
+                        await _dispatcher.InvokeAsync(
+                            () => LastUserOperationErrorMessage =
+                                $"An operation cancellation callback failed: {exception.Message}",
+                            CancellationToken.None).ConfigureAwait(false);
+                    }
                     await _dispatcher.InvokeAsync(
-                        () => IsUserOperationRunning = false,
+                        () =>
+                        {
+                            CanCancelUserOperation = false;
+                            IsUserOperationRunning = false;
+                        },
                         CancellationToken.None)
                         .ConfigureAwait(false);
                 }
@@ -320,34 +417,36 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             try
             {
                 BackendProfileSet loaded;
+                HashSet<Guid> profilesWithCredentials = [];
                 try
                 {
                     loaded = await _profileStore.LoadAsync(cancellationToken).ConfigureAwait(false);
+                    foreach (BackendProfile profile in loaded.Profiles)
+                    {
+                        if (await _credentialStore.ExistsAsync(profile.Id, cancellationToken)
+                            .ConfigureAwait(false))
+                        {
+                            profilesWithCredentials.Add(profile.Id);
+                        }
+                    }
                 }
                 catch (Exception exception) when (exception is not OperationCanceledException)
                 {
                     await _dispatcher.InvokeAsync(() =>
                     {
-                        LastErrorMessage = $"Backend profiles could not be loaded: {exception.Message}";
-                        IsInitialized = true;
+                        ProfileLoadError = $"Backend profiles could not be loaded: {exception.Message}";
+                        LastErrorMessage = ProfileLoadError;
+                        ProfileLoadState = BackendProfilesLoadState.Failed;
                     }, CancellationToken.None).ConfigureAwait(false);
                     return;
-                }
-
-                HashSet<Guid> profilesWithCredentials = [];
-                foreach (BackendProfile profile in loaded.Profiles)
-                {
-                    if (await _credentialStore.ExistsAsync(profile.Id, cancellationToken)
-                        .ConfigureAwait(false))
-                    {
-                        profilesWithCredentials.Add(profile.Id);
-                    }
                 }
 
                 SetProfileState(loaded, profilesWithCredentials);
                 await _dispatcher.InvokeAsync(() =>
                 {
-                    ReplaceCollection(_profiles, loaded.Profiles);
+                    PublishProfiles(loaded);
+                    ProfileLoadError = null;
+                    LastErrorMessage = null;
                     IsInitialized = true;
                 }, cancellationToken).ConfigureAwait(false);
 
@@ -397,6 +496,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         Guid? supersededProfileId = null;
         Exception? credentialCleanupException = null;
 
+        await EnsureProfilesLoadedAsync(cancellationToken).ConfigureAwait(false);
         await _profileWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -557,7 +657,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
 
             SetProfileSet(updated);
             await _dispatcher.InvokeAsync(
-                () => ReplaceCollection(_profiles, updated.Profiles),
+                () => PublishProfiles(updated),
                 CancellationToken.None).ConfigureAwait(false);
             await SwitchSessionAsync(profile, _shutdownSource.Token).ConfigureAwait(false);
             if (credentialCleanupException is not null)
@@ -582,6 +682,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
+        await EnsureProfilesLoadedAsync(cancellationToken).ConfigureAwait(false);
         await _profileWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -614,6 +715,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         bool removedActiveProfile;
         BackendProfileSet updated;
 
+        await EnsureProfilesLoadedAsync(cancellationToken).ConfigureAwait(false);
         await _profileWriteGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -658,7 +760,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             SetCredentialPresence(profileId, hasCredential: false);
             SetProfileSet(updated);
             await _dispatcher.InvokeAsync(
-                () => ReplaceCollection(_profiles, updated.Profiles),
+                () => PublishProfiles(updated),
                 CancellationToken.None).ConfigureAwait(false);
             if (removedActiveProfile)
             {
@@ -699,6 +801,11 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
                 cancellationToken,
                 session.Lifetime);
             await LoadInitialStateAsync(session, linked.Token).ConfigureAwait(false);
+            linked.Token.ThrowIfCancellationRequested();
+            if (string.IsNullOrWhiteSpace(SessionSnapshot.Version))
+            {
+                await RefreshVersionAsync(session, linked.Token).ConfigureAwait(false);
+            }
         }
         finally
         {
@@ -1351,6 +1458,13 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             {
                 SessionSnapshot = session.Snapshot;
                 LastErrorMessage = session.Snapshot.StatusDetail;
+                if (session.Snapshot.State == BackendConnectionState.OfflineRetrying &&
+                    string.IsNullOrWhiteSpace(session.Snapshot.Version))
+                {
+                    _resourceFailures["version"] = session.Snapshot.StatusDetail ??
+                        "The initial version request failed.";
+                    _retryableResourceFailures.Add("version");
+                }
                 OnPropertyChanged(nameof(HasActiveSession));
             }).ConfigureAwait(false);
 
@@ -1367,6 +1481,7 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
                 backgroundTasks.Add(PumpHonkRuntimeStatisticsAsync(
                     session,
                     workSource.Token));
+                backgroundTasks.Add(PumpResourceRecoveryAsync(session, workSource.Token));
 
                 _backgroundTasks = backgroundTasks.ToArray();
             }
@@ -1535,103 +1650,33 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             return;
         }
 
-        int successes = results.Count(static succeeded => succeeded);
-        if (successes == 0)
+        if (results.Any(static succeeded => succeeded))
         {
-            return;
+            await TryRefreshSmartWeightsAsync(session, cancellationToken).ConfigureAwait(false);
+            await TryRefreshHonkRuntimeStatisticsAsync(session, cancellationToken)
+                .ConfigureAwait(false);
         }
-
-        await DispatchForEpochAsync(session.Epoch, () =>
-        {
-            BackendConnectionState state = successes == results.Length
-                ? BackendConnectionState.Online
-                : BackendConnectionState.Degraded;
-            BackendConnectionState? streamState = GetStreamConnectionState();
-            if (streamState is
-                BackendConnectionState.Unauthorized or
-                BackendConnectionState.Degraded or
-                BackendConnectionState.OfflineRetrying)
-            {
-                state = streamState.Value;
-            }
-
-            if (SessionSnapshot.State == BackendConnectionState.Unauthorized)
-            {
-                return;
-            }
-
-            DateTimeOffset now = _timeProvider.GetUtcNow();
-            SessionSnapshot = SessionSnapshot with
-            {
-                State = state,
-                StateChangedAt = SessionSnapshot.State == state
-                    ? SessionSnapshot.StateChangedAt
-                    : now,
-                LastSuccessfulContactAt = now,
-                StatusDetail = state == BackendConnectionState.Online
-                    ? null
-                    : SessionSnapshot.StatusDetail,
-                Capabilities = session.Capabilities.GetSnapshot(),
-            };
-            if (state == BackendConnectionState.Online)
-            {
-                LastErrorMessage = null;
-            }
-        }).ConfigureAwait(false);
-
-        await TryRefreshSmartWeightsAsync(session, cancellationToken).ConfigureAwait(false);
-        await TryRefreshHonkRuntimeStatisticsAsync(session, cancellationToken)
-            .ConfigureAwait(false);
     }
 
-    private async Task<bool> LoadResourceAsync<T>(
+    private Task<bool> LoadResourceAsync<T>(
         IBackendSession session,
         string operation,
         Func<CancellationToken, Task<T>> load,
         Action<T> publish,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            T value = await load(cancellationToken).ConfigureAwait(false);
-            await DispatchForEpochAsync(session.Epoch, () =>
-            {
-                _resourceFailures.Remove(operation);
-                publish(value);
-            }).ConfigureAwait(false);
-            return true;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return false;
-        }
-        catch (Exception exception)
-        {
-            await ReportFailureAsync(
-                session,
-                operation,
-                exception,
-                isResourceFailure: true).ConfigureAwait(false);
-            return false;
-        }
-    }
+        CancellationToken cancellationToken) =>
+        FetchResourceAsync(session, operation, load, publish,
+            throwOnFailure: false, trackFailure: true, cancellationToken);
 
     private async Task RefreshProxiesAsync(
         IBackendSession session,
         CancellationToken cancellationToken)
     {
-        ProxyCatalog proxies = await session.RestClient.GetProxiesAsync(cancellationToken)
+        await Task.WhenAll(
+            FetchResourceAsync(session, "proxies", session.RestClient.GetProxiesAsync,
+                value => ProxyCatalog = value, throwOnFailure: true, trackFailure: true, cancellationToken),
+            FetchResourceAsync(session, "proxy providers", session.RestClient.GetProxyProvidersAsync,
+                value => ProxyProviders = value, throwOnFailure: true, trackFailure: true, cancellationToken))
             .ConfigureAwait(false);
-        ProxyProviderCatalog providers = await session.RestClient.GetProxyProvidersAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await DispatchForEpochAsync(session.Epoch, () =>
-        {
-            _resourceFailures.Remove("proxies");
-            _resourceFailures.Remove("proxy providers");
-            ProxyCatalog = proxies;
-            ProxyProviders = providers;
-            MarkLiveContact();
-        }).ConfigureAwait(false);
         await TryRefreshSmartWeightsAsync(session, cancellationToken).ConfigureAwait(false);
     }
 
@@ -1648,11 +1693,9 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         }
 
         using CancellationTokenSource linked = CreateOperationSource(session, cancellationToken);
-        SmartWeights weights = await session.RestClient.GetSmartWeightsAsync(linked.Token)
+        await FetchResourceAsync(session, "smart weights", session.RestClient.GetSmartWeightsAsync,
+            value => SmartWeights = value, throwOnFailure: true, trackFailure: false, linked.Token)
             .ConfigureAwait(false);
-        await DispatchForEpochAsync(session.Epoch, () => SmartWeights = weights)
-            .ConfigureAwait(false);
-        await PublishSuccessfulContactAsync(session).ConfigureAwait(false);
     }
 
     private async Task TryRefreshSmartWeightsAsync(
@@ -1676,10 +1719,6 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         {
             throw;
         }
-        catch (ClashAuthenticationException exception)
-        {
-            await ReportFailureAsync(session, "smart weights", exception).ConfigureAwait(false);
-        }
         catch
         {
             // Smart groups are response-driven; failure of this optional detail must not fail proxy refresh.
@@ -1698,12 +1737,9 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
     {
         EnsureCapabilityAvailable(session, ClashCapability.RuntimeStatistics);
         using CancellationTokenSource linked = CreateOperationSource(session, cancellationToken);
-        HonkRuntimeStatistics statistics = await session.RestClient
-            .GetHonkRuntimeStatisticsAsync(linked.Token).ConfigureAwait(false);
-        await DispatchForEpochAsync(
-            session.Epoch,
-            () => HonkRuntimeStatistics = statistics).ConfigureAwait(false);
-        await PublishSuccessfulContactAsync(session).ConfigureAwait(false);
+        await FetchResourceAsync(session, "runtime statistics", session.RestClient.GetHonkRuntimeStatisticsAsync,
+            value => HonkRuntimeStatistics = value, throwOnFailure: true, trackFailure: false, linked.Token)
+            .ConfigureAwait(false);
     }
 
     private async Task TryRefreshHonkRuntimeStatisticsAsync(
@@ -1727,13 +1763,6 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         {
             throw;
         }
-        catch (ClashAuthenticationException exception)
-        {
-            await ReportFailureAsync(
-                session,
-                "runtime statistics",
-                exception).ConfigureAwait(false);
-        }
         catch
         {
             // Runtime statistics are optional and polled separately from core session health.
@@ -1750,34 +1779,21 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         IBackendSession session,
         CancellationToken cancellationToken)
     {
-        RuleCatalog rules = await session.RestClient.GetRulesAsync(cancellationToken)
+        await Task.WhenAll(
+            FetchResourceAsync(session, "rules", session.RestClient.GetRulesAsync,
+                value => RuleCatalog = value, throwOnFailure: true, trackFailure: true, cancellationToken),
+            FetchResourceAsync(session, "rule providers", session.RestClient.GetRuleProvidersAsync,
+                value => RuleProviders = value, throwOnFailure: true, trackFailure: true, cancellationToken))
             .ConfigureAwait(false);
-        RuleProviderCatalog providers = await session.RestClient.GetRuleProvidersAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await DispatchForEpochAsync(session.Epoch, () =>
-        {
-            _resourceFailures.Remove("rules");
-            _resourceFailures.Remove("rule providers");
-            RuleCatalog = rules;
-            RuleProviders = providers;
-            MarkLiveContact();
-        }).ConfigureAwait(false);
     }
 
     private async Task RefreshConfigurationAsync(
         IBackendSession session,
         CancellationToken cancellationToken)
     {
-        ClashConfiguration configuration = await session.RestClient
-            .GetConfigurationAsync(cancellationToken).ConfigureAwait(false);
-        await DispatchForEpochAsync(
-            session.Epoch,
-            () =>
-            {
-                _resourceFailures.Remove("configuration");
-                Configuration = configuration;
-                MarkLiveContact();
-            }).ConfigureAwait(false);
+        await FetchResourceAsync(session, "configuration", session.RestClient.GetConfigurationAsync,
+            value => Configuration = value, throwOnFailure: true, trackFailure: true, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task PublishSuccessfulContactAsync(IBackendSession session)
@@ -2262,32 +2278,47 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         Exception exception,
         bool isResourceFailure = false)
     {
-        await DispatchForEpochAsync(session.Epoch, () =>
+        await DispatchForEpochAsync(session.Epoch,
+            () => ApplyFailure(session, operation, exception, isResourceFailure)).ConfigureAwait(false);
+    }
+
+    private void ApplyFailure(
+        IBackendSession session,
+        string operation,
+        Exception exception,
+        bool isResourceFailure)
+    {
+        BackendConnectionState state = exception is ClashAuthenticationException
+            ? BackendConnectionState.Unauthorized
+            : BackendConnectionState.Degraded;
+        if (SessionSnapshot.State == BackendConnectionState.Unauthorized &&
+            state != BackendConnectionState.Unauthorized)
         {
-            BackendConnectionState state = exception is ClashAuthenticationException
-                ? BackendConnectionState.Unauthorized
-                : BackendConnectionState.Degraded;
-            if (SessionSnapshot.State == BackendConnectionState.Unauthorized &&
-                state != BackendConnectionState.Unauthorized)
-            {
-                return;
-            }
+            return;
+        }
 
-            string detail = $"The {operation} failed: {exception.Message}";
-            if (isResourceFailure)
+        string detail = $"The {operation} failed: {exception.Message}";
+        if (isResourceFailure)
+        {
+            _resourceFailures[operation] = detail;
+            if (IsRetryableResourceFailure(exception))
             {
-                _resourceFailures[operation] = detail;
+                _retryableResourceFailures.Add(operation);
             }
-
-            LastErrorMessage = detail;
-            SessionSnapshot = SessionSnapshot with
+            else
             {
-                State = state,
-                StateChangedAt = _timeProvider.GetUtcNow(),
-                StatusDetail = detail,
-                Capabilities = session.Capabilities.GetSnapshot(),
-            };
-        }).ConfigureAwait(false);
+                _retryableResourceFailures.Remove(operation);
+            }
+        }
+
+        LastErrorMessage = detail;
+        SessionSnapshot = SessionSnapshot with
+        {
+            State = state,
+            StateChangedAt = _timeProvider.GetUtcNow(),
+            StatusDetail = detail,
+            Capabilities = session.Capabilities.GetSnapshot(),
+        };
     }
 
     private void MarkLiveContact()
@@ -2533,6 +2564,12 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
             new SessionLogsChangedEventArgs([], removedLogCount, isReset: true));
         _streamStatuses.Clear();
         _resourceFailures.Clear();
+        _retryableResourceFailures.Clear();
+        lock (_resourceRequestGate)
+        {
+            _resourceRequests.Clear();
+            _pendingResourceRequests.Clear();
+        }
 
         SessionSnapshot = profile is null
             ? BackendSessionSnapshot.NoBackend(epoch, _timeProvider.GetUtcNow())
@@ -2605,6 +2642,29 @@ public sealed partial class AppSessionCoordinator : ObservableObject, IAsyncDisp
         {
             _profileSet = value;
         }
+    }
+
+    private async Task EnsureProfilesLoadedAsync(CancellationToken cancellationToken)
+    {
+        if (ProfileLoadState == BackendProfilesLoadState.NotLoaded)
+        {
+            await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!CanWriteProfiles)
+        {
+            throw new InvalidOperationException(
+                "Backend profiles are unavailable. Retry loading them before making changes. " +
+                ProfileLoadError);
+        }
+    }
+
+    private void PublishProfiles(BackendProfileSet profiles)
+    {
+        ReplaceCollection(_profiles, profiles.Profiles);
+        ProfileLoadState = profiles.Profiles.Count == 0
+            ? BackendProfilesLoadState.Empty
+            : BackendProfilesLoadState.Loaded;
     }
 
     private void SetProfileState(

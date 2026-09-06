@@ -173,9 +173,20 @@ internal sealed class ClashWebSocketPump
                             detail: "The remote endpoint closed the stream.");
                     }
                 }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                catch (Exception exception) when (
+                    (exception is OperationCanceledException or WebSocketException) &&
+                    cancellationToken.IsCancellationRequested)
                 {
                     break;
+                }
+                catch (TimeoutException exception)
+                {
+                    attempt++;
+                    PublishStatus(
+                        streamKind,
+                        ClashStreamState.Retrying,
+                        attempt,
+                        detail: exception.Message);
                 }
                 catch (ClashAuthenticationException exception)
                 {
@@ -288,11 +299,23 @@ internal sealed class ClashWebSocketPump
 
         Uri uri = ClashUriFactory.WebSocket(_endpoint, pathSegments, effectiveQuery);
         using ClientWebSocket socket = new();
+        // Some Clash-compatible endpoints only write frames and never process ping requests.
+        // Detect stalled periodic streams with message deadlines instead of requiring pong replies.
         socket.Options.KeepAliveInterval = _options.KeepAliveInterval;
         socket.Options.CollectHttpResponseDetails = true;
+        using CancellationTokenSource handshakeTimeout = new(_options.HandshakeTimeout, _timeProvider);
+        using CancellationTokenSource handshakeLifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            handshakeTimeout.Token);
         try
         {
-            await socket.ConnectAsync(uri, cancellationToken).ConfigureAwait(false);
+            await socket.ConnectAsync(uri, handshakeLifetime.Token).ConfigureAwait(false);
+        }
+        catch (Exception exception) when (
+            (exception is OperationCanceledException or WebSocketException) &&
+            !cancellationToken.IsCancellationRequested && handshakeTimeout.IsCancellationRequested)
+        {
+            throw new TimeoutException("The WebSocket handshake timed out; retrying.");
         }
         catch (WebSocketException) when (socket.HttpStatusCode is
             HttpStatusCode.Unauthorized or
@@ -308,12 +331,13 @@ internal sealed class ClashWebSocketPump
             throw new ClashStreamUnsupportedException(socket.HttpStatusCode, uri);
         }
 
+        handshakeTimeout.CancelAfter(Timeout.InfiniteTimeSpan);
         ObserveSupported(capability);
         PublishStatus(streamKind, ClashStreamState.Connected, retryAttempt: 0);
 
         while (socket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
         {
-            TWire? wire = await ReceiveMessageAsync(socket, typeInfo, uri, cancellationToken)
+            TWire? wire = await ReceiveMessageAsync(socket, streamKind, typeInfo, uri, cancellationToken)
                 .ConfigureAwait(false);
             if (wire is null)
             {
@@ -327,10 +351,18 @@ internal sealed class ClashWebSocketPump
 
     private async Task<T?> ReceiveMessageAsync<T>(
         ClientWebSocket socket,
+        ClashStreamKind streamKind,
         JsonTypeInfo<T> typeInfo,
         Uri requestUri,
         CancellationToken cancellationToken)
     {
+        bool awaitingFirstLogFragment = streamKind == ClashStreamKind.Logs;
+        using CancellationTokenSource messageTimeout = new(
+            awaitingFirstLogFragment ? Timeout.InfiniteTimeSpan : _options.MessageTimeout,
+            _timeProvider);
+        using CancellationTokenSource messageLifetime = CancellationTokenSource.CreateLinkedTokenSource(
+            cancellationToken,
+            messageTimeout.Token);
         byte[] buffer = ArrayPool<byte>.Shared.Rent(_options.ReceiveBufferSize);
         try
         {
@@ -340,7 +372,7 @@ internal sealed class ClashWebSocketPump
             {
                 result = await socket.ReceiveAsync(
                     new ArraySegment<byte>(buffer),
-                    cancellationToken).ConfigureAwait(false);
+                    messageLifetime.Token).ConfigureAwait(false);
 
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
@@ -362,6 +394,12 @@ internal sealed class ClashWebSocketPump
                 }
 
                 message.Write(buffer, 0, result.Count);
+                if (awaitingFirstLogFragment && !result.EndOfMessage)
+                {
+                    // Logs may be silent indefinitely, but an in-progress message must complete.
+                    messageTimeout.CancelAfter(_options.MessageTimeout);
+                    awaitingFirstLogFragment = false;
+                }
             }
             while (!result.EndOfMessage);
 
@@ -387,6 +425,12 @@ internal sealed class ClashWebSocketPump
                     requestUri,
                     exception);
             }
+        }
+        catch (Exception exception) when (
+            (exception is OperationCanceledException or WebSocketException) &&
+            !cancellationToken.IsCancellationRequested && messageTimeout.IsCancellationRequested)
+        {
+            throw new TimeoutException("The WebSocket message timed out; retrying.");
         }
         finally
         {

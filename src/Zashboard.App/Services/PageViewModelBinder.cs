@@ -47,6 +47,9 @@ public sealed partial class PageViewModelBinder : IDisposable
         _rules = rules ?? throw new ArgumentNullException(nameof(rules));
         _logs = logs ?? throw new ArgumentNullException(nameof(logs));
         _settings = settings ?? throw new ArgumentNullException(nameof(settings));
+        _overview.SetActive(false);
+        _connections.SetActive(false);
+        _logs.SetActive(false);
     }
 
     public void Attach(ShellPage shell)
@@ -62,10 +65,12 @@ public sealed partial class PageViewModelBinder : IDisposable
         _shell = shell;
         _shell.NavigationFrame.Navigated += OnFrameNavigated;
         _shell.BackendActivationRequested += OnBackendActivationRequested;
+        _shell.CancelOperationRequested += OnCancelOperationRequested;
         _shell.SetBackendItemsSource(_backendSetup.SavedBackends);
         _coordinator.PropertyChanged += OnCoordinatorPropertyChanged;
         UpdateShellMessage();
-        _shell.SetOperationInProgress(_coordinator.IsUserOperationRunning);
+        UpdateGlobalOperationMessage();
+        UpdateOperationAvailability();
 
         if (_shell.NavigationFrame.Content is FrameworkElement content)
         {
@@ -109,7 +114,7 @@ public sealed partial class PageViewModelBinder : IDisposable
                 break;
         }
 
-        page.IsHitTestVisible = !_coordinator.IsUserOperationRunning;
+        UpdatePageOperationAvailability(page);
     }
 
     private void BindBackendSetup(BackendSetupPage page, BindingRegistration registration)
@@ -147,6 +152,22 @@ public sealed partial class PageViewModelBinder : IDisposable
         };
         EventHandler<BackendSelectedEventArgs> activate = async (_, args) =>
             await _backendSetup.ActivateAsync(args.BackendId);
+        EventHandler retry = async (_, _) =>
+        {
+            try
+            {
+                await _coordinator.RunUserOperationAsync(
+                    _coordinator.InitializeAsync,
+                    allowCancellation: false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception exception)
+            {
+                page.ShowMessage("Saved backends could not be loaded", exception.Message, InfoBarSeverity.Error);
+            }
+        };
         EventHandler<BackendSelectedEventArgs> remove = async (_, args) =>
         {
             if (await _backendSetup.RemoveAsync(args.BackendId))
@@ -156,9 +177,11 @@ public sealed partial class PageViewModelBinder : IDisposable
         };
         page.ConnectRequested += connect;
         page.ActivateRequested += activate;
+        page.RetryProfilesRequested += retry;
         page.RemoveRequested += remove;
         registration.Add(() => page.ConnectRequested -= connect);
         registration.Add(() => page.ActivateRequested -= activate);
+        registration.Add(() => page.RetryProfilesRequested -= retry);
         registration.Add(() => page.RemoveRequested -= remove);
         BindErrors(
             _backendSetup,
@@ -169,6 +192,8 @@ public sealed partial class PageViewModelBinder : IDisposable
 
     private void BindOverview(OverviewPage page, BindingRegistration registration)
     {
+        _overview.SetActive(true);
+        registration.Add(() => _overview.SetActive(IsActivePage<OverviewPage>(page)));
         page.ViewModel = _overview;
         BindCollection(_overview.RecentConnections, page.RecentConnections, registration);
         BindCollection(_overview.Modes, page.ModeOptions, registration);
@@ -303,6 +328,8 @@ public sealed partial class PageViewModelBinder : IDisposable
 
     private void BindConnections(ConnectionsPage page, BindingRegistration registration)
     {
+        _connections.SetActive(true);
+        registration.Add(() => _connections.SetActive(IsActivePage<ConnectionsPage>(page)));
         page.ViewModel = _connections;
         BindCollection(_connections.Connections, page.Connections, registration);
         EventHandler refresh = async (_, _) => await _connections.RefreshAsync();
@@ -363,10 +390,7 @@ public sealed partial class PageViewModelBinder : IDisposable
             await _rules.UpdateProviderAsync(args.ProviderName);
         PropertyChangedEventHandler changed = (_, _) =>
         {
-            page.ApplyProviderCapabilities(
-                _rules.CanUpdateProviders,
-                _coordinator.SessionSnapshot.State is
-                    BackendConnectionState.Online or BackendConnectionState.Degraded);
+            UpdateRuleCapabilities(page);
             page.ApplyViewState(_rules.Query, _rules.Filter);
         };
         page.RefreshRequested += refresh;
@@ -386,15 +410,14 @@ public sealed partial class PageViewModelBinder : IDisposable
             (title, message) => page.ShowMessage(title, message, InfoBarSeverity.Error),
             page.ClearErrorMessage,
             registration);
-        page.ApplyProviderCapabilities(
-            _rules.CanUpdateProviders,
-            _coordinator.SessionSnapshot.State is
-                BackendConnectionState.Online or BackendConnectionState.Degraded);
+        UpdateRuleCapabilities(page);
         page.ApplyViewState(_rules.Query, _rules.Filter);
     }
 
     private void BindLogs(LogsPage page, BindingRegistration registration)
     {
+        _logs.SetActive(true);
+        registration.Add(() => _logs.SetActive(IsActivePage<LogsPage>(page)));
         page.ViewModel = _logs;
         page.AttachLogEntries(_logs.LogEntries);
         registration.Add(page.DetachLogEntries);
@@ -608,14 +631,12 @@ public sealed partial class PageViewModelBinder : IDisposable
 
     private void OnCoordinatorPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName == nameof(AppSessionCoordinator.IsUserOperationRunning))
+        if (args.PropertyName is nameof(AppSessionCoordinator.IsUserOperationRunning) or
+            nameof(AppSessionCoordinator.CanCancelUserOperation) or
+            nameof(AppSessionCoordinator.CanWriteProfiles) or
+            nameof(AppSessionCoordinator.ProfileLoadError))
         {
-            foreach (FrameworkElement page in _registrations.Keys)
-            {
-                page.IsHitTestVisible = !_coordinator.IsUserOperationRunning;
-            }
-
-            _shell?.SetOperationInProgress(_coordinator.IsUserOperationRunning);
+            UpdateOperationAvailability();
         }
 
         if (args.PropertyName is nameof(AppSessionCoordinator.LastErrorMessage) or
@@ -623,7 +644,78 @@ public sealed partial class PageViewModelBinder : IDisposable
         {
             UpdateShellMessage();
         }
+
+        if (args.PropertyName == nameof(AppSessionCoordinator.LastUserOperationErrorMessage))
+        {
+            UpdateGlobalOperationMessage();
+        }
     }
+
+    private void OnCancelOperationRequested(object? sender, EventArgs args) =>
+        _coordinator.CancelUserOperation();
+
+    private void UpdateGlobalOperationMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_coordinator.LastUserOperationErrorMessage))
+        {
+            _shell?.ClearOperationMessage();
+        }
+        else
+        {
+            _shell?.ShowOperationMessage(
+                "Controller operation failed",
+                _coordinator.LastUserOperationErrorMessage,
+                InfoBarSeverity.Error);
+        }
+    }
+
+    private void UpdateOperationAvailability()
+    {
+        foreach (FrameworkElement page in _registrations.Keys)
+        {
+            UpdatePageOperationAvailability(page);
+        }
+
+        _shell?.SetOperationInProgress(
+            _coordinator.IsUserOperationRunning,
+            _coordinator.CanCancelUserOperation,
+            _coordinator.CanWriteProfiles);
+    }
+
+    private void UpdatePageOperationAvailability(FrameworkElement page)
+    {
+        switch (page)
+        {
+            case BackendSetupPage backendPage:
+                backendPage.ApplyOperationAvailability(
+                    _coordinator.IsUserOperationRunning,
+                    _coordinator.CanWriteProfiles,
+                    _coordinator.ProfileLoadError);
+                break;
+            case OverviewPage overviewPage:
+                UpdateOverviewSession(overviewPage);
+                UpdateOverviewControls(overviewPage);
+                UpdateOverviewHonkStatistics(overviewPage);
+                break;
+            case ProxiesPage proxiesPage:
+                UpdateProxyCapabilities(proxiesPage);
+                break;
+            case ConnectionsPage connectionsPage:
+                UpdateConnections(connectionsPage);
+                break;
+            case RulesPage rulesPage:
+                UpdateRuleCapabilities(rulesPage);
+                break;
+            case SettingsPage settingsPage:
+                settingsPage.ApplyControllerAvailability(_settings);
+                break;
+        }
+    }
+
+    private bool IsActivePage<TPage>(FrameworkElement releasedPage) where TPage : FrameworkElement =>
+        _shell?.NavigationFrame.Content is TPage currentPage &&
+        !ReferenceEquals(currentPage, releasedPage) &&
+        _registrations.ContainsKey(currentPage);
 
     private async void OnBackendActivationRequested(
         object? sender,
@@ -699,7 +791,7 @@ public sealed partial class PageViewModelBinder : IDisposable
             statusSeverity,
             new SolidColorBrush(color),
             _overview.IsOnline,
-            _coordinator.HasActiveSession &&
+            !_coordinator.IsUserOperationRunning && _coordinator.HasActiveSession &&
                 _coordinator.SessionSnapshot.State != BackendConnectionState.Unauthorized);
     }
 
@@ -717,8 +809,8 @@ public sealed partial class PageViewModelBinder : IDisposable
         page.ApplyControllerState(
             _overview.SelectedMode,
             _overview.IsTunEnabled,
-            _overview.CanChangeMode,
-            _overview.CanChangeTun);
+            _overview.CanChangeMode && !_coordinator.IsUserOperationRunning,
+            _overview.CanChangeTun && !_coordinator.IsUserOperationRunning);
     }
 
     private void UpdateOverviewTrafficHistory(OverviewPage page)
@@ -740,7 +832,7 @@ public sealed partial class PageViewModelBinder : IDisposable
     {
         page.SetHonkRuntimeStatistics(
             _overview.IsHonkStatisticsVisible,
-            _overview.CanRefreshHonkStatistics,
+            _overview.CanRefreshHonkStatistics && !_coordinator.IsUserOperationRunning,
             _overview.HonkStatisticsStatus,
             _overview.HonkTotalConnections,
             _overview.HonkActiveConnections,
@@ -752,9 +844,17 @@ public sealed partial class PageViewModelBinder : IDisposable
     private void UpdateProxyCapabilities(ProxiesPage page)
     {
         page.ApplyProviderCapabilities(
-            _proxies.CanUpdateProviders,
-            _proxies.CanCheckProviders,
-            _coordinator.SessionSnapshot.State is
+            _proxies.CanUpdateProviders && !_coordinator.IsUserOperationRunning,
+            _proxies.CanCheckProviders && !_coordinator.IsUserOperationRunning,
+            !_coordinator.IsUserOperationRunning && _coordinator.SessionSnapshot.State is
+                BackendConnectionState.Online or BackendConnectionState.Degraded);
+    }
+
+    private void UpdateRuleCapabilities(RulesPage page)
+    {
+        page.ApplyProviderCapabilities(
+            _rules.CanUpdateProviders && !_coordinator.IsUserOperationRunning,
+            !_coordinator.IsUserOperationRunning && _coordinator.SessionSnapshot.State is
                 BackendConnectionState.Online or BackendConnectionState.Degraded);
     }
 
@@ -762,7 +862,7 @@ public sealed partial class PageViewModelBinder : IDisposable
     {
         page.ApplyConnectionState(
             _connections.TotalCount,
-            _coordinator.HasActiveSession &&
+            !_coordinator.IsUserOperationRunning && _coordinator.HasActiveSession &&
                 _coordinator.SessionSnapshot.State is
                 BackendConnectionState.Online or BackendConnectionState.Degraded);
         page.ApplyViewState(_connections.Query, _connections.IsPaused);
@@ -875,6 +975,7 @@ public sealed partial class PageViewModelBinder : IDisposable
 
         _shell.NavigationFrame.Navigated -= OnFrameNavigated;
         _shell.BackendActivationRequested -= OnBackendActivationRequested;
+        _shell.CancelOperationRequested -= OnCancelOperationRequested;
         _shell.SetBackendItemsSource(null);
         _coordinator.PropertyChanged -= OnCoordinatorPropertyChanged;
         _shell = null;

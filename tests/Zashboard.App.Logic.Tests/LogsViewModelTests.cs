@@ -10,6 +10,59 @@ namespace Zashboard.App.Logic.Tests;
 public sealed class LogsViewModelTests
 {
     [TestMethod]
+    public async Task InactiveProjectionResumesFromLatestRetainedLogsAndCurrentFilter()
+    {
+        await using AppSessionCoordinator coordinator = CreateCoordinator(logBufferSize: 500);
+        coordinator.AppendLogsForTest(
+            Enumerable.Range(0, 500).Select(index => Message($"old {index}")).ToArray(),
+            DateTimeOffset.UnixEpoch);
+        using LogsViewModel viewModel = new(coordinator);
+        viewModel.SetActive(false);
+        List<NotifyCollectionChangedAction> actions = [];
+        viewModel.LogEntries.CollectionChanged += (_, args) => actions.Add(args.Action);
+        await viewModel.SetQueryAsync("new", "all");
+        coordinator.AppendLogsForTest(
+            [Message("newest")],
+            DateTimeOffset.UnixEpoch.AddSeconds(1),
+            droppedBeforeDisplay: 2);
+
+        Assert.IsEmpty(actions);
+        Assert.AreEqual("old 0", viewModel.LogEntries[0].Message);
+        Assert.AreEqual("newest", coordinator.Logs[^1].Message);
+
+        viewModel.SetActive(true);
+
+        Assert.HasCount(1, viewModel.LogEntries);
+        Assert.AreEqual("newest", viewModel.LogEntries[0].Message);
+        Assert.AreEqual(500, viewModel.SourceEntryCount);
+        Assert.AreEqual(2L, viewModel.DroppedLogCount);
+    }
+
+    [TestMethod]
+    public async Task InactivePausedProjectionPreservesFreezeAndHonorsClear()
+    {
+        await using AppSessionCoordinator coordinator = CreateCoordinator();
+        coordinator.AppendLogsForTest([Message("old")], DateTimeOffset.UnixEpoch);
+        using LogsViewModel viewModel = new(coordinator);
+        await viewModel.SetPausedAsync(true);
+        viewModel.SetActive(false);
+        coordinator.AppendLogsForTest([Message("new")], DateTimeOffset.UnixEpoch.AddSeconds(1));
+
+        viewModel.SetActive(true);
+
+        Assert.IsTrue(viewModel.IsPaused);
+        Assert.AreEqual("old", viewModel.LogEntries.Single().Message);
+        viewModel.SetActive(false);
+        await viewModel.ClearAsync();
+        Assert.IsEmpty(viewModel.LogEntries);
+        coordinator.AppendLogsForTest([Message("after clear")], DateTimeOffset.UnixEpoch.AddSeconds(2));
+        viewModel.SetActive(true);
+        Assert.IsEmpty(viewModel.LogEntries);
+        await viewModel.SetPausedAsync(false);
+        Assert.AreEqual("after clear", viewModel.LogEntries.Single().Message);
+    }
+
+    [TestMethod]
     public async Task LiveRetentionDeltaUsesIncrementalCollectionNotifications()
     {
         await using AppSessionCoordinator coordinator = CreateCoordinator(logBufferSize: 500);

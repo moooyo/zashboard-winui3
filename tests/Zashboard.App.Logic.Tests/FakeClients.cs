@@ -16,11 +16,21 @@ internal sealed class FakeBackendProfileStore : IBackendProfileStore
 
     public Exception? SaveException { get; set; }
 
+    public Exception? LoadException { get; set; }
+
+    public int LoadCallCount { get; private set; }
+
     public List<BackendProfileSet> Saves { get; } = [];
 
     public ValueTask<BackendProfileSet> LoadAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        LoadCallCount++;
+        if (LoadException is not null)
+        {
+            throw LoadException;
+        }
+
         return ValueTask.FromResult(Current);
     }
 
@@ -145,7 +155,8 @@ internal sealed class FakeBackendSession : IBackendSession
         SessionEpoch epoch,
         BackendProfile profile,
         bool holdStreamsAfterCancellation = false,
-        Exception? disposeException = null)
+        Exception? disposeException = null,
+        BackendSessionSnapshot? snapshot = null)
     {
         Epoch = epoch;
         Profile = profile;
@@ -153,7 +164,7 @@ internal sealed class FakeBackendSession : IBackendSession
         Capabilities = new CapabilityRegistry();
         Rest = new FakeClashRestClient();
         Streams = new FakeClashStreamClient(holdStreamsAfterCancellation);
-        _snapshot = new BackendSessionSnapshot
+        _snapshot = snapshot ?? new BackendSessionSnapshot
         {
             Epoch = epoch,
             ProfileId = profile.Id,
@@ -219,6 +230,22 @@ internal sealed class FakeBackendSession : IBackendSession
 
 internal sealed class FakeClashRestClient : IClashRestClient
 {
+    public Func<CancellationToken, Task<ClashVersion>>? GetVersionHandler { get; set; }
+
+    public Func<CancellationToken, Task<ProxyCatalog>>? GetProxiesHandler { get; set; }
+
+    public Func<CancellationToken, Task<ProxyProviderCatalog>>? GetProxyProvidersHandler { get; set; }
+
+    public Func<CancellationToken, Task<RuleCatalog>>? GetRulesHandler { get; set; }
+
+    public Func<CancellationToken, Task<RuleProviderCatalog>>? GetRuleProvidersHandler { get; set; }
+
+    public Func<CancellationToken, Task<ClashConfiguration>>? GetConfigurationHandler { get; set; }
+
+    public Func<CancellationToken, Task<SmartWeights>>? GetSmartWeightsHandler { get; set; }
+
+    public Func<CancellationToken, Task<HonkRuntimeStatistics>>? GetHonkRuntimeStatisticsHandler { get; set; }
+
     public Func<CancellationToken, Task>? FlushDnsCacheHandler { get; set; }
 
     public ProxyCatalog ProxiesResult { get; set; } = new();
@@ -234,14 +261,14 @@ internal sealed class FakeClashRestClient : IClashRestClient
     public List<string> BlockSmartConnectionCalls { get; } = [];
 
     public Task<ClashVersion> GetVersionAsync(CancellationToken cancellationToken = default) =>
-        Result(new ClashVersion
+        GetVersionHandler?.Invoke(cancellationToken) ?? Result(new ClashVersion
         {
             Value = "Mihomo Meta test",
             CoreKind = ClashCoreKind.Mihomo,
         }, cancellationToken);
 
     public Task<ProxyCatalog> GetProxiesAsync(CancellationToken cancellationToken = default) =>
-        Result(ProxiesResult, cancellationToken);
+        GetProxiesHandler?.Invoke(cancellationToken) ?? Result(ProxiesResult, cancellationToken);
 
     public Task SelectProxyAsync(
         string groupName,
@@ -277,6 +304,7 @@ internal sealed class FakeClashRestClient : IClashRestClient
 
     public Task<ProxyProviderCatalog> GetProxyProvidersAsync(
         CancellationToken cancellationToken = default) =>
+        GetProxyProvidersHandler?.Invoke(cancellationToken) ??
         Result(new ProxyProviderCatalog(), cancellationToken);
 
     public Task UpdateProxyProviderAsync(
@@ -290,10 +318,11 @@ internal sealed class FakeClashRestClient : IClashRestClient
         Complete(cancellationToken);
 
     public Task<RuleCatalog> GetRulesAsync(CancellationToken cancellationToken = default) =>
-        Result(new RuleCatalog(), cancellationToken);
+        GetRulesHandler?.Invoke(cancellationToken) ?? Result(new RuleCatalog(), cancellationToken);
 
     public Task<RuleProviderCatalog> GetRuleProvidersAsync(
         CancellationToken cancellationToken = default) =>
+        GetRuleProvidersHandler?.Invoke(cancellationToken) ??
         Result(new RuleProviderCatalog(), cancellationToken);
 
     public Task UpdateRuleProviderAsync(
@@ -338,6 +367,7 @@ internal sealed class FakeClashRestClient : IClashRestClient
 
     public Task<ClashConfiguration> GetConfigurationAsync(
         CancellationToken cancellationToken = default) =>
+        GetConfigurationHandler?.Invoke(cancellationToken) ??
         Result(new ClashConfiguration { Mode = "rule" }, cancellationToken);
 
     public Task PatchConfigurationAsync(
@@ -391,13 +421,14 @@ internal sealed class FakeClashRestClient : IClashRestClient
         Complete(cancellationToken);
 
     public Task<SmartWeights> GetSmartWeightsAsync(CancellationToken cancellationToken = default) =>
-        Result(SmartWeightsResult, cancellationToken);
+        GetSmartWeightsHandler?.Invoke(cancellationToken) ?? Result(SmartWeightsResult, cancellationToken);
 
     public Task FlushSmartWeightsAsync(CancellationToken cancellationToken = default) =>
         Complete(cancellationToken);
 
     public Task<HonkRuntimeStatistics> GetHonkRuntimeStatisticsAsync(
         CancellationToken cancellationToken = default) =>
+        GetHonkRuntimeStatisticsHandler?.Invoke(cancellationToken) ??
         Result(HonkStatisticsResult, cancellationToken);
 
     private static Task Complete(CancellationToken cancellationToken)

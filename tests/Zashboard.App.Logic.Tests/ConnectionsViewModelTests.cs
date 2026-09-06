@@ -19,6 +19,104 @@ public sealed class ConnectionsViewModelTests
     private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
 
     [TestMethod]
+    public async Task InactiveProjectionDefersUpdatesAndResumesLatestSnapshotWithExistingIdentity()
+    {
+        (AppSessionCoordinator coordinator, ConnectionTestSession session, _) =
+            await CreateActiveCoordinatorAsync();
+        using ConnectionsViewModel viewModel = new(coordinator);
+        session.Streams.Publish(Snapshot(Connection("stable", "first.example")));
+        await WaitUntilAsync(() => viewModel.Connections.Count == 1);
+        ConnectionDisplayItem row = viewModel.Connections[0];
+        List<NotifyCollectionChangedAction> collectionActions = [];
+        viewModel.Connections.CollectionChanged += (_, args) =>
+            collectionActions.Add(args.Action);
+
+        viewModel.SetActive(false);
+        await viewModel.SetQueryAsync("second");
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        session.Streams.Publish(Snapshot(
+            Connection("stable", "second.example"),
+            Connection("new", "third.example")));
+        await WaitUntilAsync(() => coordinator.ConnectionSnapshot?.Connections.Count == 2);
+
+        Assert.AreEqual("first.example", row.Host);
+        Assert.AreEqual(1, viewModel.TotalCount);
+        Assert.HasCount(1, viewModel.Connections);
+        Assert.IsEmpty(collectionActions);
+
+        await viewModel.DisconnectAsync("stable");
+        await viewModel.BlockAsync("stable");
+        await viewModel.DisconnectAllAsync();
+        Assert.IsEmpty(session.Rest.CloseConnectionCalls);
+        Assert.IsEmpty(session.Rest.BlockSmartConnectionCalls);
+        Assert.AreEqual(0, session.Rest.CloseAllConnectionsCallCount);
+
+        viewModel.SetActive(true);
+
+        Assert.AreEqual(2, viewModel.TotalCount);
+        Assert.HasCount(1, viewModel.Connections);
+        Assert.AreSame(row, viewModel.Connections[0]);
+        Assert.AreEqual("second.example", row.Host);
+        await viewModel.SetQueryAsync(null);
+        Assert.HasCount(2, viewModel.Connections);
+        await coordinator.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task ReactivationPreservesTheUsersPausedSnapshot()
+    {
+        (AppSessionCoordinator coordinator, ConnectionTestSession session, _) =
+            await CreateActiveCoordinatorAsync();
+        using ConnectionsViewModel viewModel = new(coordinator);
+        session.Streams.Publish(Snapshot(Connection("old", "old.example")));
+        await WaitUntilAsync(() => viewModel.Connections.Count == 1);
+        await viewModel.SetPausedAsync(true);
+        viewModel.SetActive(false);
+        await Task.Delay(TimeSpan.FromMilliseconds(300));
+        session.Streams.Publish(Snapshot(Connection("new", "new.example")));
+        await WaitUntilAsync(() =>
+            coordinator.ConnectionSnapshot?.Connections.SingleOrDefault()?.Id == "new");
+
+        viewModel.SetActive(true);
+
+        Assert.IsTrue(viewModel.IsPaused);
+        Assert.AreEqual("old", viewModel.Connections.Single().Id);
+        await viewModel.DisconnectAllAsync();
+        Assert.AreEqual(0, session.Rest.CloseAllConnectionsCallCount);
+
+        await viewModel.SetPausedAsync(false);
+        Assert.AreEqual("new", viewModel.Connections.Single().Id);
+        await coordinator.DisposeAsync();
+    }
+
+    [TestMethod]
+    public async Task InactiveEpochSwitchClearsPausedSnapshotBeforeReactivation()
+    {
+        (AppSessionCoordinator coordinator, ConnectionTestSession firstSession,
+            FakeBackendSessionFactory sessions) = await CreateActiveCoordinatorAsync();
+        using ConnectionsViewModel viewModel = new(coordinator);
+        firstSession.Streams.Publish(Snapshot(Connection("old", "old.example")));
+        await WaitUntilAsync(() => viewModel.Connections.Count == 1);
+        await viewModel.SetPausedAsync(true);
+        viewModel.SetActive(false);
+
+        await coordinator.RunUserOperationAsync(coordinator.ReconnectAsync);
+        ConnectionTestSession secondSession = (ConnectionTestSession)sessions.CreatedSessions[^1];
+        await secondSession.Streams.AllStarted.WaitAsync(TestTimeout);
+        secondSession.Streams.Publish(Snapshot(Connection("new", "new.example")));
+        await WaitUntilAsync(() => coordinator.ConnectionSnapshot?.Connections.Count == 1);
+
+        Assert.IsEmpty(viewModel.Connections);
+        Assert.AreEqual(0, viewModel.TotalCount);
+        viewModel.SetActive(true);
+        Assert.IsTrue(viewModel.IsPaused);
+        Assert.IsEmpty(viewModel.Connections);
+        await viewModel.RefreshAsync();
+        Assert.AreEqual("new", viewModel.Connections.Single().Id);
+        await coordinator.DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task StableRowsUpdateInPlaceWithoutCollectionReset()
     {
         (AppSessionCoordinator coordinator, ConnectionTestSession session, _) =
